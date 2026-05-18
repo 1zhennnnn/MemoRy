@@ -16,3 +16,10 @@ lib/*/src/**/*.js.map
 # Build caches
 .turbo/
 *.tsbuildinfo
+
+# Claude Code project instructions (dev tool, not needed for deployment)
+CLAUDE.md
+**/CLAUDE.md
+
+# Design documentation
+System design Doc/
