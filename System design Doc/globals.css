@@ -1,0 +1,383 @@
+/* globals.css — MemoRy Circuit Memory 設計系統 CSS 變數 */
+/* 放置於 artifacts/web-dashboard/src/globals.css 和 artifacts/chrome-ext/src/popup/globals.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────
+   CSS Custom Properties（Circuit Memory 主題）
+   ───────────────────────────────────────────── */
+:root {
+  /* 背景層次 */
+  --color-void:    #090C14;
+  --color-surf-0:  #0F1219;
+  --color-surf-1:  #0C1220;
+  --color-surf-2:  #161A28;
+  --color-surf-3:  #1C2134;
+
+  /* 品牌色（取樣自 MemoRy Logo.png） */
+  --color-signal:         #5B7AE0;
+  --color-signal-dark:    #2E4DB0;
+  --color-signal-light:   #7B96F0;
+  --color-signal-dim:     rgba(91, 122, 224, 0.10);
+  --color-signal-border:  rgba(91, 122, 224, 0.40);
+  --color-signal-border-hi: rgba(91, 122, 224, 0.60);
+
+  --color-circuit:        #8B7AE0;
+  --color-circuit-light:  #A898F0;
+  --color-circuit-dim:    rgba(139, 122, 224, 0.10);
+  --color-circuit-border: rgba(139, 122, 224, 0.40);
+
+  /* 語意色 */
+  --color-done:    #34D4A8;
+  --color-pending: #F0A030;
+  --color-failed:  #F05068;
+
+  /* 文字 */
+  --color-text-hi:  #DFE4F0;
+  --color-text-mid: #8A96B2;
+  --color-text-lo:  #4A5272;
+
+  /* 邊框（藍調） */
+  --color-line-faint: rgba(88, 100, 160, 0.13);
+  --color-line-mid:   rgba(88, 100, 160, 0.32);
+  --color-line-sel:   rgba(91, 122, 224, 0.60);
+
+  /* 卡片左側 accent 條 */
+  --border-accent-blue:   2px solid var(--color-signal);
+  --border-accent-purple: 2px solid var(--color-circuit);
+
+  /* 字型 */
+  --font-sans: system-ui, -apple-system, "Noto Sans TC", sans-serif;
+  --font-mono: "Courier New", Courier, monospace;
+
+  /* 間距 */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  12px;
+  --space-lg:  16px;
+  --space-xl:  20px;
+  --space-2xl: 24px;
+  --space-3xl: 32px;
+
+  /* 圓角 */
+  --radius-tag:   4px;
+  --radius-input: 7px;
+  --radius-card:  10px;
+  --radius-popup: 14px;
+  --radius-icon:  7px;
+}
+
+/* ─────────────────────────────────────────────
+   全域基礎樣式
+   ───────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-hi);
+  background-color: var(--color-surf-0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─────────────────────────────────────────────
+   Scrollbar 樣式（細線版，符合暗色主題）
+   ───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-mid);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-line-sel);
+}
+
+/* ─────────────────────────────────────────────
+   共用元件樣式
+   ───────────────────────────────────────────── */
+
+/* 卡片 */
+.memory-card {
+  background: var(--color-surf-2);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  transition: background 150ms ease, border-color 150ms ease;
+  cursor: pointer;
+}
+.memory-card:hover {
+  background: var(--color-surf-3);
+  border-color: var(--color-line-mid);
+}
+.memory-card.selected {
+  border-left: var(--border-accent-blue);
+  border-radius: 0 var(--radius-card) var(--radius-card) 0;
+  background: var(--color-surf-3);
+}
+.memory-card.ai-card {
+  border-left: var(--border-accent-purple);
+  border-radius: 0 var(--radius-card) var(--radius-card) 0;
+}
+
+/* Tag Badge — Signal Blue 系（使用者輸入類） */
+.tag-blue {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-tag);
+  border: 1px solid var(--color-signal-border);
+  color: var(--color-signal-light);
+  background: var(--color-signal-dim);
+  white-space: nowrap;
+}
+
+/* Tag Badge — Circuit Purple 系（AI 輸出類） */
+.tag-purple {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-tag);
+  border: 1px solid var(--color-circuit-border);
+  color: var(--color-circuit-light);
+  background: var(--color-circuit-dim);
+  white-space: nowrap;
+}
+
+/* 按鈕 */
+.btn-primary {
+  background: var(--color-signal);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-input);
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 130ms;
+}
+.btn-primary:hover { background: var(--color-signal-light); }
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-mid);
+  border: 1px solid var(--color-line-mid);
+  border-radius: var(--radius-input);
+  padding: 9px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 130ms;
+}
+.btn-ghost:hover { background: var(--color-surf-3); }
+
+.btn-ai {
+  background: var(--color-circuit-dim);
+  color: var(--color-circuit-light);
+  border: 1px solid var(--color-circuit-border);
+  border-radius: var(--radius-input);
+  padding: 9px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* 輸入框 */
+.input-field {
+  background: var(--color-surf-2);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-input);
+  color: var(--color-text-hi);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  width: 100%;
+  outline: none;
+  transition: border-color 130ms;
+}
+.input-field:focus { border-color: var(--color-line-sel); }
+.input-field::placeholder { color: var(--color-text-lo); }
+
+/* Sidebar 導覽項目 */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  color: var(--color-text-lo);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 120ms, background 120ms;
+  text-decoration: none;
+}
+.nav-item:hover {
+  color: var(--color-text-mid);
+  background: rgba(88, 100, 160, 0.07);
+}
+.nav-item.active {
+  color: var(--color-signal-light);
+  background: rgba(91, 122, 224, 0.10);
+  border-left: 2px solid var(--color-signal);
+  border-radius: 0 7px 7px 0;
+}
+
+/* 分隔線 */
+.sep {
+  border: none;
+  border-top: 1px solid var(--color-line-faint);
+  margin: 12px 0;
+}
+
+/* ─────────────────────────────────────────────
+   動畫 Keyframes
+   ───────────────────────────────────────────── */
+
+/* Pixel 碎片漂移 */
+@keyframes pxdrift {
+  0%, 100% { opacity: 1; transform: translate(0, 0); }
+  60%       { opacity: 0.2; transform: translate(1px, -1px); }
+}
+
+/* Pending 卡片掃描光帶 */
+@keyframes sweep {
+  0%   { left: -120%; }
+  100% { left: 160%; }
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.7; }
+}
+
+/* ✦ Star 出現動畫 */
+@keyframes starAppear {
+  0%   { opacity: 0; transform: scale(0) rotate(-45deg); }
+  60%  { transform: scale(1.2) rotate(0deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+/* Dot pulse（備用） */
+@keyframes dpulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
+/* ─────────────────────────────────────────────
+   Skeleton 佔位元件
+   ───────────────────────────────────────────── */
+.skeleton {
+  background: var(--color-surf-3);
+  border-radius: 4px;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────────
+   Pending 卡片掃描容器
+   ───────────────────────────────────────────── */
+.pending-card {
+  position: relative;
+  overflow: hidden;
+}
+.pending-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 70%;
+  height: 100%;
+  background: rgba(240, 160, 48, 0.05);
+  animation: sweep 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ─────────────────────────────────────────────
+   時間軸連接線群組
+   ───────────────────────────────────────────── */
+.tl-group {
+  position: relative;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tl-group::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--color-line-faint);
+}
+.tl-node {
+  position: absolute;
+  left: 1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-surf-2);
+  border: 1.5px solid var(--color-line-mid);
+  top: 21px;
+}
+.tl-node.done  { border-color: var(--color-done); }
+.tl-node.pending { border-color: var(--color-pending); }
+.tl-node.failed  { border-color: var(--color-failed); }
+
+/* ─────────────────────────────────────────────
+   Toast 通知
+   ───────────────────────────────────────────── */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-surf-1);
+  border: 1px solid var(--color-line-mid);
+  border-radius: var(--radius-card);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--color-text-hi);
+  min-width: 240px;
+  max-width: 360px;
+  animation: slideIn 200ms ease-out forwards;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─────────────────────────────────────────────
+   Extension Popup 專用（固定 380px）
+   ───────────────────────────────────────────── */
+.popup-root {
+  width: 380px;
+  min-height: 520px;
+  background: var(--color-void);
+  color: var(--color-text-hi);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}

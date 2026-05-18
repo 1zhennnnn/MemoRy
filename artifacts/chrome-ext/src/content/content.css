@@ -1,0 +1,29 @@
+#memory-capture-bar {
+  all: initial;
+  position: absolute;
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#memory-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483647;
+  background: #1A2035;
+  border: 1px solid #2A3555;
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: #DFE4F0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  animation: memory-toast-in 0.2s ease-out;
+}
+
+@keyframes memory-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

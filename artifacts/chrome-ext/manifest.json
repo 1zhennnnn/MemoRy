@@ -1,0 +1,82 @@
+{
+  "manifest_version": 3,
+  "name": "MemoRy — AI 知識管理",
+  "short_name": "MemoRy",
+  "version": "1.1.0",
+  "description": "AI 碎片化知識管理系統，自動摘要、標籤、語意搜尋",
+
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    },
+    "default_title": "MemoRy"
+  },
+
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/index.js"],
+      "css": ["src/content/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "storage",
+    "tabs",
+    "scripting",
+    "identity",
+    "sidePanel",
+    "alarms"
+  ],
+
+  "host_permissions": ["<all_urls>"],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["src/content/content.css", "icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+
+  "commands": {
+    "save-selection": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "儲存選取文字至 MemoRy"
+    },
+    "save-screenshot": {
+      "suggested_key": { "default": "Alt+Shift+P" },
+      "description": "截圖儲存至 MemoRy"
+    },
+    "save-page": {
+      "suggested_key": { "default": "Alt+Shift+A" },
+      "description": "擷取整頁文字至 MemoRy"
+    }
+  },
+
+  "externally_connectable": {
+    "matches": ["https://*.supabase.co/*"]
+  }
+}

@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+*.env.local
+*.log
+.DS_Store
+.replit
+replit.nix
+
+# TypeScript compiled artifacts in source directories
+artifacts/*/src/**/*.js
+artifacts/*/src/**/*.js.map
+lib/*/src/**/*.js
+lib/*/src/**/*.js.map
+
+# Build caches
+.turbo/
+*.tsbuildinfo

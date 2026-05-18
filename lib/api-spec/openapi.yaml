@@ -1,0 +1,571 @@
+openapi: 3.1.0
+info:
+  title: MemoRy API
+  version: 0.1.0
+  description: AI 碎片化知識管理系統 API
+
+servers:
+  - url: /api
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+
+    NoteCard:
+      type: object
+      required: [id, tags, noteType, aiStatus, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        aiTitle:
+          type: string
+          nullable: true
+        aiSummary:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        sourceUrl:
+          type: string
+          nullable: true
+        sourceTitle:
+          type: string
+          nullable: true
+        noteType:
+          type: string
+          enum: [text, image]
+        aiStatus:
+          type: string
+          enum: [pending, done, failed]
+        createdAt:
+          type: string
+          format: date-time
+
+    NoteDetail:
+      allOf:
+        - $ref: "#/components/schemas/NoteCard"
+        - type: object
+          properties:
+            sourceText:
+              type: string
+              nullable: true
+            ocrText:
+              type: string
+              nullable: true
+            userNote:
+              type: string
+              nullable: true
+            updatedAt:
+              type: string
+              format: date-time
+            relatedNotes:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  aiTitle:
+                    type: string
+                    nullable: true
+                  aiSummary:
+                    type: string
+                    nullable: true
+
+    NoteListResponse:
+      type: object
+      required: [notes, total, page, limit]
+      properties:
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/NoteCard"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    TagItem:
+      type: object
+      required: [name, useCount]
+      properties:
+        name:
+          type: string
+        useCount:
+          type: integer
+
+    DailyReport:
+      type: object
+      required: [id, reportDate, keyLearnings, crossDomain, suggestions, noteCount]
+      properties:
+        id:
+          type: string
+          format: uuid
+        reportDate:
+          type: string
+          format: date
+        keyLearnings:
+          type: array
+          items:
+            type: string
+        crossDomain:
+          type: string
+          nullable: true
+        suggestions:
+          type: array
+          items:
+            type: string
+        diaryText:
+          type: string
+          nullable: true
+        noteCount:
+          type: integer
+
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: 健康檢查
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+
+  /notes:
+    get:
+      operationId: listNotes
+      summary: 列出筆記（分頁）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at_desc, created_at_asc]
+            default: created_at_desc
+        - name: tags
+          in: query
+          schema:
+            type: string
+          description: 逗號分隔的標籤
+        - name: domain
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteListResponse"
+
+  /notes/text:
+    post:
+      operationId: createTextNote
+      summary: 建立文字筆記
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sourceText]
+              properties:
+                sourceUrl:
+                  type: string
+                sourceTitle:
+                  type: string
+                sourceText:
+                  type: string
+                userNote:
+                  type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  noteId:
+                    type: string
+                    format: uuid
+                  aiStatus:
+                    type: string
+
+  /notes/image:
+    post:
+      operationId: createImageNote
+      summary: 建立圖片筆記
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageBase64]
+              properties:
+                sourceUrl:
+                  type: string
+                sourceTitle:
+                  type: string
+                imageBase64:
+                  type: string
+                userNote:
+                  type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  noteId:
+                    type: string
+                    format: uuid
+                  aiStatus:
+                    type: string
+
+  /notes/{id}:
+    get:
+      operationId: getNote
+      summary: 取得單一筆記
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteDetail"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      operationId: updateNote
+      summary: 更新筆記
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                aiTitle:
+                  type: string
+                aiSummary:
+                  type: string
+                userNote:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  noteId:
+                    type: string
+                  reembedding:
+                    type: boolean
+        "404":
+          description: Not Found
+    delete:
+      operationId: deleteNote
+      summary: 刪除筆記
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+
+  /search:
+    post:
+      operationId: semanticSearch
+      summary: 語意搜尋（RAG）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                topK:
+                  type: integer
+                  default: 5
+                dateFrom:
+                  type: string
+                  format: date
+                dateTo:
+                  type: string
+                  format: date
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  answer:
+                    type: string
+                  sources:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        aiTitle:
+                          type: string
+                        aiSummary:
+                          type: string
+                        score:
+                          type: number
+                        createdAt:
+                          type: string
+
+  /search/keyword:
+    get:
+      operationId: keywordSearch
+      summary: 關鍵字全文搜尋
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteListResponse"
+
+  /reports:
+    get:
+      operationId: listReports
+      summary: 列出日報
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DailyReport"
+                  total:
+                    type: integer
+
+  /reports/generate:
+    post:
+      operationId: generateReport
+      summary: AI 生成日報
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date]
+              properties:
+                date:
+                  type: string
+                  format: date
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyReport"
+
+  /reports/{date}:
+    get:
+      operationId: getReport
+      summary: 取得指定日期日報
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyReport"
+        "404":
+          description: Not Found
+
+  /reports/{date}/diary:
+    patch:
+      operationId: updateDiary
+      summary: 更新日記文字
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [diaryText]
+              properties:
+                diaryText:
+                  type: string
+      responses:
+        "200":
+          description: OK
+
+  /tags:
+    get:
+      operationId: listTags
+      summary: 取得使用者標籤
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tags:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TagItem"
+
+  /export:
+    get:
+      operationId: exportNotes
+      summary: 匯出筆記
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, markdown]
+            default: json
+      responses:
+        "200":
+          description: OK

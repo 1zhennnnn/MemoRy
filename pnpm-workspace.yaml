@@ -1,0 +1,11 @@
+﻿packages:
+  - "lib/*"
+  - "artifacts/*"
+
+allowBuilds:
+  esbuild: true
+  spawn-sync: true
+
+onlyBuiltDependencies:
+  - esbuild
+  - spawn-sync
