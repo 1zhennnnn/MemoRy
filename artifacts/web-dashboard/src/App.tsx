@@ -9,6 +9,7 @@ import NotePage from './pages/NotePage';
 import ReportsPage from './pages/ReportsPage';
 import ReportDetailPage from './pages/ReportDetailPage';
 import SettingsPage from './pages/SettingsPage';
+import BookmarksPage from './pages/BookmarksPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!getAccessToken()) return <Navigate to="/login" replace />;
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="search" element={<SearchPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="reports/:date" element={<ReportDetailPage />} />
+          <Route path="bookmarks" element={<BookmarksPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>

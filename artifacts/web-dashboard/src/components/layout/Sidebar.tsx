@@ -4,9 +4,10 @@ import { getUserEmail, logout } from '../../shared/auth';
 const SIDEBAR_W = 188;
 
 const NAV_ITEMS = [
-  { to: '/timeline', label: '時間軸', icon: '📅' },
-  { to: '/search',   label: '搜尋',   icon: '🔍' },
-  { to: '/reports',  label: '日報',   icon: '📊' },
+  { to: '/timeline',  label: '時間軸', icon: '📅' },
+  { to: '/bookmarks', label: '書籤',   icon: '🔗' },
+  { to: '/search',    label: '搜尋',   icon: '🔍' },
+  { to: '/reports',   label: '日報',   icon: '📊' },
 ];
 
 

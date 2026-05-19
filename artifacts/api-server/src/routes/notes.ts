@@ -123,7 +123,15 @@ router.get("/notes", requireAuth, async (req, res, next) => {
     const dateFrom = req.query["dateFrom"] ? String(req.query["dateFrom"]) : undefined;
     const dateTo   = req.query["dateTo"]   ? String(req.query["dateTo"])   : undefined;
 
+    const typeFilter = req.query["type"] ? String(req.query["type"]) : "notes";
+
     const conditions = [eq(notesTable.userId, userId)];
+    if (typeFilter === "bookmarks") {
+      conditions.push(eq(notesTable.noteType, "bookmark"));
+    } else {
+      // 預設時間軸只顯示 text / image，排除 bookmark
+      conditions.push(sql`${notesTable.noteType} != 'bookmark'`);
+    }
     if (tagsQ?.length) conditions.push(arrayContains(notesTable.tags, tagsQ));
     if (domain)   conditions.push(sql`${notesTable.sourceUrl} ILIKE ${"%" + domain + "%"}`);
     if (dateFrom) conditions.push(gte(notesTable.createdAt, new Date(dateFrom)));
@@ -212,6 +220,41 @@ router.post("/notes/image", requireAuth, async (req, res, next) => {
     void triggerOcrAndAiProcessing(note!.id, imageBase64);
 
     res.status(201).json({ noteId: note!.id, aiStatus: note!.aiStatus });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/notes/bookmark", requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const { sourceUrl, sourceTitle, userNote } = req.body as {
+      sourceUrl?: string;
+      sourceTitle?: string;
+      userNote?: string;
+    };
+
+    if (!sourceUrl) {
+      throw new AppError("sourceUrl is required", ERROR_CODES.MISSING_FIELD, 400);
+    }
+
+    const [note] = await db
+      .insert(notesTable)
+      .values({
+        userId,
+        sourceUrl,
+        sourceTitle,
+        sourceText: sourceTitle ?? sourceUrl,
+        userNote,
+        noteType: "bookmark",
+        aiStatus: "done",
+        aiTitle: sourceTitle ?? sourceUrl,
+        aiSummary: null,
+      })
+      .returning({ id: notesTable.id, aiStatus: notesTable.aiStatus });
+
+    req.log.info({ noteId: note!.id }, "Bookmark created");
+    res.status(201).json({ noteId: note!.id, aiStatus: "done" });
   } catch (err) {
     next(err);
   }

@@ -186,9 +186,8 @@ async function savePageText(tabId: number, token: string): Promise<unknown> {
 }
 
 async function saveBookmark(tab: chrome.tabs.Tab, token: string): Promise<unknown> {
-  return saveTextNote({
-    sourceText: tab.title ?? tab.url ?? "書籤",
-    sourceUrl:  tab.url,
+  return apiPost("/api/notes/bookmark", {
+    sourceUrl:   tab.url,
     sourceTitle: tab.title,
   }, token);
 }

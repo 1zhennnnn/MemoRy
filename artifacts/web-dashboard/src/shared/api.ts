@@ -33,6 +33,7 @@ interface NotesListParams {
   page?: number;
   limit?: number;
   tag?: string;
+  type?: 'notes' | 'bookmarks';
 }
 
 export const api = {
@@ -42,8 +43,11 @@ export const api = {
       if (params?.page) q.set('page', String(params.page));
       if (params?.limit) q.set('limit', String(params.limit));
       if (params?.tag) q.set('tag', params.tag);
+      if (params?.type) q.set('type', params.type);
       return request<NoteListResponse>(`/notes?${q.toString()}`);
     },
+    createBookmark: (body: { sourceUrl: string; sourceTitle?: string; userNote?: string }) =>
+      request<{ noteId: string; aiStatus: string }>('/notes/bookmark', { method: 'POST', body: JSON.stringify(body) }),
     get: (id: string) => request<NoteDetail>(`/notes/${id}`),
     createText: (body: { sourceText: string; sourceUrl?: string; sourceTitle?: string; userNote?: string }) =>
       request<{ noteId: string; aiStatus: string }>('/notes/text', { method: 'POST', body: JSON.stringify(body) }),
