@@ -36,6 +36,9 @@ interface NotesListParams {
   type?: 'notes' | 'bookmarks';
 }
 
+export const healthz = () =>
+  fetch(`${API_BASE}/api/healthz`).then((r) => r.ok).catch(() => false);
+
 export const api = {
   notes: {
     list: (params?: NotesListParams) => {

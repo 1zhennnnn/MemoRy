@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getUserEmail, logout } from '../shared/auth';
-import { api } from '../shared/api';
+import { api, healthz } from '../shared/api';
 import Spinner from '../components/common/Spinner';
 
 export default function SettingsPage() {
@@ -13,10 +13,7 @@ export default function SettingsPage() {
       .then((res) => setNoteCount(res.total))
       .catch(() => setNoteCount(null));
 
-    const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:5000';
-    fetch(`${API_BASE}/api/healthz`)
-      .then((r) => setHealthOk(r.ok))
-      .catch(() => setHealthOk(false));
+    healthz().then(setHealthOk);
   }, []);
 
   function handleExport(format: 'json' | 'markdown') {
