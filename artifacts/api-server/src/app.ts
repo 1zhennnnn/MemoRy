@@ -8,8 +8,9 @@ import router from "./routes/index.js";
 const app: Express = express();
 
 app.use(pinoHttp({ logger }));
+const allowedOrigin = (process.env.ALLOWED_ORIGIN || "").replace(/\/$/, "") || "*";
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || "*",
+  origin: allowedOrigin,
   credentials: true,
 }));
 app.use(express.json({ limit: "15mb" }));
