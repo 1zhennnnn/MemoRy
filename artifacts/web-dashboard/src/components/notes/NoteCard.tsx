@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -5,10 +6,12 @@ import type { NoteCard as NoteCardType } from '../../shared/types';
 import TagBadge from '../common/TagBadge';
 import StarDone from '../common/StarDone';
 import PixelCluster from '../common/PixelCluster';
+import { api } from '../../shared/api';
 
 interface NoteCardProps {
   note: NoteCardType;
   onDelete?: (id: string) => void;
+  onRetry?: (id: string) => void;
 }
 
 function accentColor(status: NoteCardType['aiStatus']) {
@@ -22,12 +25,26 @@ function domain(url: string | null) {
   try { return new URL(url).hostname; } catch { return url; }
 }
 
-export default function NoteCard({ note, onDelete }: NoteCardProps) {
+export default function NoteCard({ note, onDelete, onRetry }: NoteCardProps) {
   const navigate = useNavigate();
+  const [confirming, setConfirming] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
-  const allTags = note.tags.map((t) => ({ label: t, variant: 'ai' as const }));
+  async function handleRetry(e: React.MouseEvent) {
+    e.stopPropagation();
+    setRetrying(true);
+    try {
+      await api.notes.retryAi(note.id);
+      onRetry?.(note.id);
+    } finally {
+      setRetrying(false);
+    }
+  }
 
-  const timeAgo = formatDistanceToNow(new Date(note.createdAt), { addSuffix: true, locale: zhTW });
+  const allTags = (note.tags ?? []).map((t) => ({ label: t, variant: 'ai' as const }));
+
+  const createdDate = note.createdAt ? new Date(note.createdAt) : new Date();
+  const timeAgo = formatDistanceToNow(createdDate, { addSuffix: true, locale: zhTW });
 
   return (
     <div
@@ -103,14 +120,43 @@ export default function NoteCard({ note, onDelete }: NoteCardProps) {
       </div>
 
       {/* Actions */}
-      {onDelete && (
+      {note.aiStatus === 'failed' && (
         <button
           className="btn-ghost"
-          style={{ fontSize: 12, padding: '4px 8px', flexShrink: 0 }}
-          onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
+          style={{ fontSize: 12, padding: '4px 8px', flexShrink: 0, color: 'var(--color-pending)' }}
+          onClick={handleRetry}
+          disabled={retrying}
         >
-          刪除
+          {retrying ? '處理中...' : '重新處理'}
         </button>
+      )}
+      {onDelete && (
+        confirming ? (
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+            <button
+              className="btn-ghost"
+              style={{ fontSize: 12, padding: '4px 8px', color: 'var(--color-failed)', borderColor: 'var(--color-failed)' }}
+              onClick={() => { onDelete(note.id); setConfirming(false); }}
+            >
+              確認刪除
+            </button>
+            <button
+              className="btn-ghost"
+              style={{ fontSize: 12, padding: '4px 8px' }}
+              onClick={() => setConfirming(false)}
+            >
+              取消
+            </button>
+          </div>
+        ) : (
+          <button
+            className="btn-ghost"
+            style={{ fontSize: 12, padding: '4px 8px', flexShrink: 0 }}
+            onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
+          >
+            刪除
+          </button>
+        )
       )}
     </div>
   );

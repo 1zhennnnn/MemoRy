@@ -228,7 +228,7 @@ export default function NotePage() {
             </div>
           )}
           <div style={{ color: 'var(--color-text-lo)' }}>
-            📅 {format(parseISO(note.createdAt), 'yyyy-MM-dd HH:mm', { locale: zhTW })}
+            📅 {note.createdAt ? format(parseISO(note.createdAt), 'yyyy-MM-dd HH:mm', { locale: zhTW }) : '—'}
           </div>
           <div style={{ color: 'var(--color-text-lo)' }}>
             📦 {note.noteType === 'image' ? '截圖' : '文字'}類型

@@ -5,7 +5,10 @@ import type { Message } from "../shared/types.js";
 
 let captureBarRoot: HTMLDivElement | null = null;
 
-document.addEventListener("mouseup", () => {
+document.addEventListener("mouseup", (e) => {
+  // 點擊 CaptureBar 本身時不關閉，否則 onClick 來不及觸發
+  if (captureBarRoot && captureBarRoot.contains(e.target as Node)) return;
+
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed) {
     removeCaptureBar();

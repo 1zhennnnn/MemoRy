@@ -8,7 +8,7 @@ export const vectorColumn = customType<{
   config: { dimensions: number };
 }>({
   dataType(config) {
-    return `vector(${config?.dimensions ?? 768})`;
+    return `vector(${config?.dimensions ?? 3072})`;
   },
   toDriver(value) {
     return `[${value.join(",")}]`;
@@ -34,7 +34,7 @@ export const notesTable = pgTable("notes", {
   tags:        text("tags").array().notNull().default(sql`'{}'::text[]`),
   noteType:    text("note_type").notNull().default("text"),
   aiStatus:    text("ai_status").notNull().default("pending"),
-  embedding:   vectorColumn("embedding", { dimensions: 768 }),
+  embedding:   vectorColumn("embedding", { dimensions: 3072 }),
   createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

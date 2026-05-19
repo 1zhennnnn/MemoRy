@@ -13,6 +13,9 @@ artifacts/*/src/**/*.js.map
 lib/*/src/**/*.js
 lib/*/src/**/*.js.map
 
+# Local dev scripts
+start-dev.bat
+
 # Build caches
 .turbo/
 *.tsbuildinfo

@@ -115,6 +115,26 @@ router.get("/reports/:date", requireAuth, async (req, res, next) => {
   }
 });
 
+router.delete("/reports/:date", requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const date = String(req.params["date"]);
+
+    const result = await db
+      .delete(dailyReportsTable)
+      .where(and(eq(dailyReportsTable.userId, userId), eq(dailyReportsTable.reportDate, date)))
+      .returning({ id: dailyReportsTable.id });
+
+    if (!result.length) {
+      throw new AppError("Report not found", ERROR_CODES.NOT_FOUND, 404);
+    }
+
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch("/reports/:date/diary", requireAuth, async (req, res, next) => {
   try {
     const userId = req.user!.id;

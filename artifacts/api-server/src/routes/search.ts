@@ -11,9 +11,10 @@ const router: IRouter = Router();
 router.post("/search", requireAuth, async (req, res, next) => {
   try {
     const userId = req.user!.id;
-    const { query, topK = 5, dateFrom, dateTo } = req.body as {
+    const { query, topK = 5, maxDistance = 0.55, dateFrom, dateTo } = req.body as {
       query?: string;
       topK?: number;
+      maxDistance?: number;
       dateFrom?: string;
       dateTo?: string;
     };
@@ -39,27 +40,27 @@ router.post("/search", requireAuth, async (req, res, next) => {
     }>(
       sql`
         SELECT id, ai_title, ai_summary, tags, source_url, created_at,
-               (embedding <=> ${vectorStr}::vector)
-                 * (1 + 0.01 * EXTRACT(EPOCH FROM (now() - created_at)) / 86400) AS score
+               (embedding <=> ${vectorStr}::vector) AS distance
         FROM notes
         WHERE user_id = ${userId}
           AND embedding IS NOT NULL
           AND ai_status = 'done'
+          AND (embedding <=> ${vectorStr}::vector) < ${maxDistance}
           ${dateFromClause}
           ${dateToClause}
-        ORDER BY score ASC
+        ORDER BY distance ASC
         LIMIT ${topK}
       `,
     );
 
-    type SearchRow = { id: string; ai_title: string | null; ai_summary: string | null; tags: string[]; source_url: string | null; created_at: string; score: number };
+    type SearchRow = { id: string; ai_title: string | null; ai_summary: string | null; tags: string[]; source_url: string | null; created_at: string; distance: number };
     const rowArr = rows as unknown as SearchRow[];
 
     const sources = rowArr.map((r) => ({
       id:         r.id,
       aiTitle:    r.ai_title,
       aiSummary:  r.ai_summary,
-      score:      Math.round((1 - r.score) * 100) / 100,
+      score:      Math.round((1 - r.distance) * 100) / 100,
       createdAt:  r.created_at,
     }));
 
@@ -67,11 +68,12 @@ router.post("/search", requireAuth, async (req, res, next) => {
       title:     r.ai_title ?? "",
       summary:   r.ai_summary ?? "",
       sourceUrl: r.source_url ?? undefined,
+      distance:  r.distance,
     }));
 
     const answer = contexts.length
       ? await ragAnswer(query, contexts)
-      : "目前沒有足夠的筆記內容可以回答這個問題。";
+      : "目前筆記庫中找不到與此問題相關的內容。";
 
     res.json({ answer, sources });
   } catch (err) {

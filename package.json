@@ -10,7 +10,9 @@
     "typecheck": "tsc --build lib/db lib/api-zod && pnpm --filter @workspace/api-server exec tsc --noEmit",
     "typecheck:libs": "tsc --build lib/db lib/api-zod",
     "build": "tsc --build lib/db lib/api-zod && pnpm --filter @workspace/api-server run build",
-    "dev": "pnpm --filter @workspace/api-server run dev"
+    "dev": "pnpm --filter @workspace/api-server run dev",
+    "dev:dashboard": "pnpm --filter @workspace/web-dashboard run dev",
+    "dev:all": "pnpm --parallel --filter @workspace/api-server --filter @workspace/web-dashboard run dev"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

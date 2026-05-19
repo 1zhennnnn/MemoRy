@@ -13,6 +13,14 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [confirmingDate, setConfirmingDate] = useState<string | null>(null);
+
+  function handleDelete(date: string) {
+    void api.reports.delete(date).then(() => {
+      setReports((prev) => prev.filter((r) => r.reportDate !== date));
+      setConfirmingDate(null);
+    });
+  }
 
   useEffect(() => {
     api.reports.list()
@@ -70,13 +78,42 @@ export default function ReportsPage() {
             <div
               key={r.reportDate}
               className="memory-card"
+              style={{ cursor: 'pointer' }}
               onClick={() => navigate(`/reports/${r.reportDate}`)}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontWeight: 600, color: 'var(--color-text-hi)' }}>
                   📅 {format(parseISO(r.reportDate), 'yyyy年M月d日', { locale: zhTW })}
                 </span>
-                <span style={{ fontSize: 12, color: 'var(--color-text-lo)' }}>{r.noteCount} 筆</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-lo)' }}>{r.noteCount} 筆</span>
+                  {confirmingDate === r.reportDate ? (
+                    <div style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="btn-ghost"
+                        style={{ fontSize: 12, padding: '2px 8px', color: 'var(--color-failed)', borderColor: 'var(--color-failed)' }}
+                        onClick={() => handleDelete(r.reportDate)}
+                      >
+                        確認刪除
+                      </button>
+                      <button
+                        className="btn-ghost"
+                        style={{ fontSize: 12, padding: '2px 8px' }}
+                        onClick={() => setConfirmingDate(null)}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn-ghost"
+                      style={{ fontSize: 12, padding: '2px 8px' }}
+                      onClick={(e) => { e.stopPropagation(); setConfirmingDate(r.reportDate); }}
+                    >
+                      刪除
+                    </button>
+                  )}
+                </div>
               </div>
               {r.keyLearnings[0] && (
                 <div

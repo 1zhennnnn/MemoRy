@@ -18,7 +18,8 @@ export default function CaptureBar({ text, sourceUrl, sourceTitle, onClose }: Ca
         type: "SAVE_TEXT",
         payload: { sourceText: text, sourceUrl, sourceTitle },
       };
-      await chrome.runtime.sendMessage(msg);
+      const res = await chrome.runtime.sendMessage(msg) as { error?: string } | undefined;
+      if (res?.error) throw new Error(res.error);
       setStatus("done");
       setTimeout(onClose, 1200);
     } catch {

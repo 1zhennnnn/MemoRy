@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../shared/api';
 import Spinner from '../components/common/Spinner';
 
-type Tab = 'text' | 'image';
+type Tab = 'text' | 'image' | 'batch';
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -29,6 +29,10 @@ export default function NewNotePage() {
   const [imgSourceUrl, setImgSourceUrl] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Batch tab state
+  const [batchEntries, setBatchEntries] = useState<string[]>(['', '']);
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Shared state
   const [loading, setLoading] = useState(false);
@@ -65,6 +69,25 @@ export default function NewNotePage() {
       setError(err instanceof Error ? err.message : '建立失敗');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSubmitBatch() {
+    const valid = batchEntries.filter((t) => t.trim());
+    if (!valid.length) { setError('請至少輸入一篇內容'); return; }
+    setLoading(true); setError('');
+    setBatchProgress({ done: 0, total: valid.length });
+    try {
+      await Promise.all(valid.map(async (text) => {
+        await api.notes.createText({ sourceText: text });
+        setBatchProgress((p) => p ? { ...p, done: p.done + 1 } : null);
+      }));
+      navigate('/timeline');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '部分筆記建立失敗');
+    } finally {
+      setLoading(false);
+      setBatchProgress(null);
     }
   }
 
@@ -114,6 +137,9 @@ export default function NewNotePage() {
         </button>
         <button style={tabStyle(tab === 'image')} onClick={() => { setTab('image'); setError(''); }}>
           🖼 上傳圖片
+        </button>
+        <button style={tabStyle(tab === 'batch')} onClick={() => { setTab('batch'); setError(''); }}>
+          📋 批次輸入
         </button>
       </div>
 
@@ -168,6 +194,65 @@ export default function NewNotePage() {
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmitText} disabled={loading}>
               {loading ? <Spinner size={16} color="#fff" /> : '✦ 送出並讓 AI 處理'}
+            </button>
+            <button className="btn-ghost" onClick={() => navigate(-1)} disabled={loading}>取消</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 批次輸入 ── */}
+      {tab === 'batch' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-lo)' }}>
+            每個輸入框為一篇筆記，送出後同時交給 AI 處理
+          </div>
+          {batchEntries.map((text, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <span style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-lo)', paddingTop: 10, minWidth: 24, textAlign: 'right' }}>
+                {i + 1}.
+              </span>
+              <textarea
+                className="input-field"
+                style={{ flex: 1, minHeight: 100, resize: 'vertical' }}
+                placeholder={`第 ${i + 1} 篇內容...`}
+                value={text}
+                onChange={(e) => {
+                  const next = [...batchEntries];
+                  next[i] = e.target.value;
+                  setBatchEntries(next);
+                }}
+              />
+              {batchEntries.length > 1 && (
+                <button
+                  className="btn-ghost"
+                  style={{ padding: '6px 10px', marginTop: 4, flexShrink: 0 }}
+                  onClick={() => setBatchEntries(batchEntries.filter((_, j) => j !== i))}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+
+          <button
+            className="btn-ghost"
+            style={{ alignSelf: 'flex-start', fontSize: 'var(--font-sm)' }}
+            onClick={() => setBatchEntries([...batchEntries, ''])}
+          >
+            + 新增一篇
+          </button>
+
+          {batchProgress && (
+            <div style={{ fontSize: 'var(--font-sm)', color: 'var(--color-done)', fontWeight: 600 }}>
+              處理中 {batchProgress.done} / {batchProgress.total} 篇...
+            </div>
+          )}
+
+          {error && <div style={{ color: 'var(--color-failed)', fontSize: 'var(--font-sm)' }}>{error}</div>}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmitBatch} disabled={loading}>
+              {loading ? <Spinner size={16} color="#fff" /> : `✦ 送出 ${batchEntries.filter(t => t.trim()).length} 篇`}
             </button>
             <button className="btn-ghost" onClick={() => navigate(-1)} disabled={loading}>取消</button>
           </div>

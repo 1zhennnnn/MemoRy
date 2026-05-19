@@ -52,6 +52,7 @@ export const api = {
     patch: (id: string, body: { userNote?: string; tags?: string[] }) =>
       request<{ noteId: string; reembedding: boolean }>(`/notes/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (id: string) => request<void>(`/notes/${id}`, { method: 'DELETE' }),
+    retryAi: (id: string) => request<{ noteId: string; aiStatus: string }>(`/notes/${id}/retry-ai`, { method: 'POST' }),
   },
 
   search: {
@@ -65,6 +66,7 @@ export const api = {
     list: () => request<ReportsListResponse>('/reports').then((r) => r.reports),
     get: (date: string) => request<DailyReport>(`/reports/${date}`),
     generate: () => request<DailyReport>('/reports/generate', { method: 'POST' }),
+    delete: (date: string) => request<void>(`/reports/${date}`, { method: 'DELETE' }),
     patch: (date: string, diaryText: string) =>
       request<{ reportDate: string }>(`/reports/${date}/diary`, { method: 'PATCH', body: JSON.stringify({ diaryText }) }),
   },

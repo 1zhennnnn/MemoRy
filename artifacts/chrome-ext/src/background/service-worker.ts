@@ -186,8 +186,9 @@ async function savePageText(tabId: number, token: string): Promise<unknown> {
 }
 
 async function saveScreenshot(tabId: number, token: string): Promise<unknown> {
-  const dataUrl = await chrome.tabs.captureVisibleTab({ format: "png", quality: 80 });
   const tab = await chrome.tabs.get(tabId);
+  // 必須傳 windowId，否則 MV3 service worker 環境下會截到錯誤視窗
+  const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png", quality: 80 });
   return apiPost("/api/notes/image", {
     imageBase64: dataUrl,
     sourceUrl:   tab.url,

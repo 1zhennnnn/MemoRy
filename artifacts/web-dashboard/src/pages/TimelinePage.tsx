@@ -73,6 +73,10 @@ export default function TimelinePage() {
     });
   }
 
+  function handleRetry(id: string) {
+    setNotes((prev) => prev.map((n) => n.id === id ? { ...n, aiStatus: 'pending' } : n));
+  }
+
   if (initialLoaded && notes.length === 0) {
     return (
       <EmptyState
@@ -107,7 +111,7 @@ export default function TimelinePage() {
           <div className="tl-node" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {dayNotes.map((note) => (
-              <NoteCard key={note.id} note={note} onDelete={handleDelete} />
+              <NoteCard key={note.id} note={note} onDelete={handleDelete} onRetry={handleRetry} />
             ))}
           </div>
         </div>

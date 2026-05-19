@@ -294,6 +294,32 @@ router.patch("/notes/:id", requireAuth, async (req, res, next) => {
   }
 });
 
+router.post("/notes/:id/retry-ai", requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const id = String(req.params["id"]);
+
+    const [note] = await db
+      .select({ id: notesTable.id, sourceText: notesTable.sourceText, ocrText: notesTable.ocrText, aiStatus: notesTable.aiStatus })
+      .from(notesTable)
+      .where(and(eq(notesTable.id, id), eq(notesTable.userId, userId)))
+      .limit(1);
+
+    if (!note) throw new AppError("Note not found", ERROR_CODES.NOT_FOUND, 404);
+    if (note.aiStatus === "done") throw new AppError("Already processed", ERROR_CODES.VALIDATION_ERROR, 400);
+
+    const text = note.sourceText ?? note.ocrText;
+    if (!text) throw new AppError("No text to process", ERROR_CODES.MISSING_FIELD, 400);
+
+    await db.update(notesTable).set({ aiStatus: "pending", updatedAt: new Date() }).where(eq(notesTable.id, id));
+    void triggerAiProcessing(id, text);
+
+    res.json({ noteId: id, aiStatus: "pending" });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.delete("/notes/:id", requireAuth, async (req, res, next) => {
   try {
     const userId = req.user!.id;
