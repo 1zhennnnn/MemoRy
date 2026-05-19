@@ -2,5 +2,11 @@
   "framework": null,
   "buildCommand": "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @workspace/web-dashboard run build",
   "outputDirectory": "artifacts/web-dashboard/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "header", "key": "accept", "value": ".*text/html.*" }],
+      "destination": "/index.html"
+    }
+  ]
 }
