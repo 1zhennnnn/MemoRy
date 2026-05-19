@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: memory-api
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build
+    startCommand: node artifacts/api-server/dist/index.js
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_API_URL
+        value: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
+      - key: GEMINI_EMBED_URL
+        value: https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent
