@@ -5,9 +5,7 @@ import type {
   KeywordSearchResponse, ReportsListResponse,
 } from './types';
 
-const API_BASE = import.meta.env.PROD
-  ? ''
-  : (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:5000';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:5000';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getAccessToken();

@@ -1,0 +1,5 @@
+{
+  "buildCommand": "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @workspace/web-dashboard run build",
+  "outputDirectory": "artifacts/web-dashboard/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

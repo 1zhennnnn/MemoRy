@@ -4,7 +4,7 @@ services:
     runtime: node
     region: singapore
     plan: free
-    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @workspace/web-dashboard run build && pnpm run build
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build
     startCommand: node artifacts/api-server/dist/index.js
     healthCheckPath: /api/healthz
     envVars:
@@ -12,11 +12,7 @@ services:
         value: production
       - key: PORT
         value: 10000
-      - key: VITE_API_BASE_URL
-        value: ""
-      - key: VITE_SUPABASE_URL
-        sync: false
-      - key: VITE_SUPABASE_ANON_KEY
+      - key: ALLOWED_ORIGIN
         sync: false
       - key: DATABASE_URL
         sync: false
