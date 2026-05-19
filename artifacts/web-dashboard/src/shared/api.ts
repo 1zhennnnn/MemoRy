@@ -6,7 +6,7 @@ import type {
 } from './types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)
-  ?? (import.meta.env.PROD ? '' : 'http://localhost:5000');
+  ?? (import.meta.env.PROD ? 'https://memory-hylv.onrender.com' : 'http://localhost:5000');
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getAccessToken();
