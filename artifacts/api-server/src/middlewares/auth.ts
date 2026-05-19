@@ -23,6 +23,19 @@ function parseJwtPayload(token: string): { sub?: string; email?: string } {
   }
 }
 
+// Lazy-init JWKS so we don't fail at startup if SUPABASE_URL is missing
+let jwks: ReturnType<typeof jose.createRemoteJWKSet> | null = null;
+function getJwks(): ReturnType<typeof jose.createRemoteJWKSet> | null {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  if (!supabaseUrl) return null;
+  if (!jwks) {
+    jwks = jose.createRemoteJWKSet(
+      new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
+    );
+  }
+  return jwks;
+}
+
 export async function requireAuth(
   req: Request,
   _res: Response,
@@ -34,17 +47,15 @@ export async function requireAuth(
       throw new AppError("Missing authorization header", ERROR_CODES.UNAUTHORIZED, 401);
     }
     const token = authHeader.slice(7);
-    const secret = process.env.SUPABASE_JWT_SECRET;
 
     let sub: string | undefined;
     let email: string | undefined;
 
-    if (secret) {
+    const remoteJwks = getJwks();
+    if (remoteJwks) {
+      // Verify using Supabase JWKS — works for both ES256 (new) and HS256 (legacy)
       try {
-        const { payload } = await jose.jwtVerify(
-          token,
-          new TextEncoder().encode(secret),
-        );
+        const { payload } = await jose.jwtVerify(token, remoteJwks);
         sub = payload.sub;
         email = typeof payload["email"] === "string" ? payload["email"] : undefined;
       } catch (verifyErr) {
@@ -52,7 +63,7 @@ export async function requireAuth(
         throw new AppError("Invalid token", ERROR_CODES.UNAUTHORIZED, 401);
       }
     } else {
-      // parse-only mode for development
+      // parse-only mode: no SUPABASE_URL set (local dev without env)
       const payload = parseJwtPayload(token);
       sub = payload.sub;
       email = payload.email;
