@@ -25,7 +25,7 @@ chrome.runtime.onInstalled.addListener(() => {
   });
   chrome.contextMenus.create({
     id: "memory-save-screenshot",
-    title: "📷 截圖儲存至 MemoRy",
+    title: "🔗 書籤儲存至 MemoRy",
     contexts: ["page"],
   });
 });
@@ -49,9 +49,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       await savePageText(tab.id, token);
       showToastInTab(tab.id, "✦ 已擷取整頁文字");
     }
-    if (info.menuItemId === "memory-save-screenshot" && tab?.id) {
-      await saveScreenshot(tab.id, token);
-      showToastInTab(tab.id, "✦ 已截圖儲存");
+    if (info.menuItemId === "memory-save-screenshot" && tab) {
+      await saveBookmark(tab, token);
+      if (tab.id) showToastInTab(tab.id, "✦ 已加入書籤");
     }
   })();
 });
@@ -82,8 +82,8 @@ chrome.commands.onCommand.addListener((command) => {
     }
 
     if (command === "save-screenshot") {
-      await saveScreenshot(tab.id, token);
-      showToastInTab(tab.id, "✦ 已截圖儲存");
+      await saveBookmark(tab, token);
+      showToastInTab(tab.id, "✦ 已加入書籤");
     }
 
     if (command === "save-page") {
@@ -122,7 +122,7 @@ async function handleMessage(message: Message): Promise<unknown> {
       if (!token) throw new Error("未登入");
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) throw new Error("找不到目前分頁");
-      return saveScreenshot(tab.id, token);
+      return saveBookmark(tab, token);
     }
 
     case "SAVE_PAGE_TEXT": {
@@ -185,13 +185,10 @@ async function savePageText(tabId: number, token: string): Promise<unknown> {
   }, token);
 }
 
-async function saveScreenshot(tabId: number, token: string): Promise<unknown> {
-  const tab = await chrome.tabs.get(tabId);
-  // 必須傳 windowId，否則 MV3 service worker 環境下會截到錯誤視窗
-  const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png", quality: 80 });
-  return apiPost("/api/notes/image", {
-    imageBase64: dataUrl,
-    sourceUrl:   tab.url,
+async function saveBookmark(tab: chrome.tabs.Tab, token: string): Promise<unknown> {
+  return saveTextNote({
+    sourceText: tab.title ?? tab.url ?? "書籤",
+    sourceUrl:  tab.url,
     sourceTitle: tab.title,
   }, token);
 }

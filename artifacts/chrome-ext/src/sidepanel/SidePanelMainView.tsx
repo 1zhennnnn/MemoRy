@@ -153,9 +153,9 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
             "✦ 已擷取",
           )}
           {actionBtn(
-            "📷 截圖儲存", screenshotState,
+            "🔗 快速書籤", screenshotState,
             () => runAction("SAVE_SCREENSHOT", setScreenshotState),
-            "✦ 已截圖",
+            "✦ 已書籤",
           )}
           <button
             onClick={() => void loadNotes()}
@@ -168,7 +168,7 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
           </button>
         </div>
         <div style={{ fontSize: "10px", color: "#4A5272", textAlign: "center" }}>
-          Alt+Shift+S 選取 ・ Alt+Shift+P 截圖 ・ Alt+Shift+A 整頁
+          Alt+Shift+S 選取 ・ Alt+Shift+P 書籤 ・ Alt+Shift+A 整頁
         </div>
         {lastError && (
           <div style={{
