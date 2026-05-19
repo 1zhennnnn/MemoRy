@@ -1,0 +1,8 @@
+[build]
+  command = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @workspace/web-dashboard run build"
+  publish = "artifacts/web-dashboard/dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
