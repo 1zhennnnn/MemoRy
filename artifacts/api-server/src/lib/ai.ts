@@ -6,7 +6,7 @@ const GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
 
 // ── Gemini — vision OCR + embedding ──────────────────────────────────────────
-const GOOGLE_KEY     = process.env.GEMINI_API_KEY;
+const GOOGLE_KEY     = process.env.GEMINI_API_KEY ?? process.env.GEMMA_API_KEY;
 const GEMINI_VIS_URL = process.env.GEMINI_API_URL ??
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 const GEMINI_EMB_URL = process.env.GEMINI_EMBED_URL ??

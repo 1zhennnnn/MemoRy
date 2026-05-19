@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-WinEvent -LogName Application -MaxEvents 50 -ErrorAction SilentlyContinue | Where-Object {$_.Level -eq 2 -and $_.TimeCreated -gt \\(Get-Date\\).AddMinutes\\(-30\\)} | Select-Object TimeCreated, Id, Source, @{N='Msg';E={$_.Message.Substring\\(0,[Math]::Min\\(300,$_.Message.Length\\)\\)}} | Format-List)"
+    ]
+  }
+}

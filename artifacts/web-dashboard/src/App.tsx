@@ -10,6 +10,7 @@ import ReportsPage from './pages/ReportsPage';
 import ReportDetailPage from './pages/ReportDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import BookmarksPage from './pages/BookmarksPage';
+import ChatPage from './pages/ChatPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!getAccessToken()) return <Navigate to="/login" replace />;
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="reports/:date" element={<ReportDetailPage />} />
           <Route path="bookmarks" element={<BookmarksPage />} />
+          <Route path="chat" element={<ChatPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>

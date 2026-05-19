@@ -23,8 +23,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error('登入已過期，請重新登入');
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: '請求失敗' })) as { message?: string };
-    throw new Error(err.message ?? '請求失敗');
+    const body = await res.json().catch(() => ({})) as { message?: string; error?: { message?: string } };
+    const msg = body.message ?? body.error?.message ?? `請求失敗 (${res.status})`;
+    throw new Error(msg);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -81,6 +82,16 @@ export const api = {
 
   tags: {
     list: () => request<TagItem[]>('/tags'),
+  },
+
+  agent: {
+    chat: (messages: Array<{ role: 'user' | 'assistant'; content: string }>) =>
+      request<{
+        answer: string;
+        sources: Array<{ id: string; title: string | null; summary: string | null; score?: number }>;
+        webSources: Array<{ web?: { uri: string; title: string } }>;
+        toolCalls: number;
+      }>('/agent/chat', { method: 'POST', body: JSON.stringify({ messages }) }),
   },
 
   export: {

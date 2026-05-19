@@ -179,9 +179,10 @@ async function savePageText(tabId: number, token: string): Promise<unknown> {
 
   const tab = await chrome.tabs.get(tabId);
   return saveTextNote({
-    sourceText: pageText,
-    sourceUrl:  tab.url,
+    sourceText:  pageText,
+    sourceUrl:   tab.url,
     sourceTitle: tab.title,
+    noteType:    'page',
   }, token);
 }
 

@@ -14,6 +14,8 @@ export default function NotePage() {
   const [note, setNote] = useState<NoteDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
+  const [sourceView, setSourceView] = useState<'iframe' | 'text' | null>(null);
+  const [iframeError, setIframeError] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -29,6 +31,8 @@ export default function NotePage() {
         if (cancelled) return;
         setNote(n);
         setUserNote(n.userNote ?? '');
+        // default to iframe only for full-page captures with a sourceUrl
+        setSourceView(n.noteType === 'page' && n.sourceUrl ? 'iframe' : 'text');
 
         if (n.aiStatus === 'pending') {
           intervalId = setInterval(async () => {
@@ -123,34 +127,82 @@ export default function NotePage() {
           </section>
         )}
 
-        {/* Source text */}
-        {(note.sourceText || note.ocrText) && (
+        {/* Source view */}
+        {(note.sourceText || note.ocrText || note.sourceUrl) && (
           <section>
-            <button
-              className="btn-ghost"
-              style={{ fontSize: 12, padding: '6px 12px' }}
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded ? '▲ 收起原始文字' : '▼ 展開原始文字'}
-            </button>
-            {expanded && (
-              <div
-                style={{
-                  marginTop: 8,
-                  background: 'var(--color-surf-1)',
-                  border: '1px solid var(--color-line-faint)',
-                  borderRadius: 'var(--radius-card)',
-                  padding: 16,
-                  fontSize: 12,
-                  color: 'var(--color-text-mid)',
-                  lineHeight: 1.7,
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  maxHeight: 360,
-                  overflowY: 'auto',
-                }}
+            {/* Toggle bar */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                className="btn-ghost"
+                style={{ fontSize: 12, padding: '6px 12px' }}
+                onClick={() => setExpanded((v) => !v)}
               >
-                {note.sourceText ?? note.ocrText}
+                {expanded ? '▲ 收起' : '▼ 展開原始內容'}
+              </button>
+              {expanded && note.sourceUrl && (
+                <>
+                  {(sourceView === 'text' || iframeError) && (
+                    <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 10px' }}
+                      onClick={() => { setSourceView('iframe'); setIframeError(false); }}>
+                      🌐 網頁
+                    </button>
+                  )}
+                  {sourceView === 'iframe' && !iframeError && (
+                    <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 10px' }}
+                      onClick={() => setSourceView('text')}>
+                      📄 文字
+                    </button>
+                  )}
+                  <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer"
+                    className="btn-ghost" style={{ fontSize: 12, padding: '6px 10px', textDecoration: 'none' }}>
+                    ↗ 新分頁
+                  </a>
+                </>
+              )}
+            </div>
+
+            {expanded && (
+              <div style={{ marginTop: 8 }}>
+                {/* iframe — inline, extends to fill viewport width minus sidebar */}
+                {note.sourceUrl && (sourceView === 'iframe') && !iframeError ? (
+                  <div style={{
+                    // Break out of the main column rightward to fill full available width.
+                    // calc(100vw - 188px - 48px) = viewport - sidebar - main padding(24*2).
+                    // Shift left to align with the main content left edge.
+                    width: 'calc(100vw - 188px - 48px)',
+                    marginLeft: 'calc(50% - (100vw - 188px - 48px) / 2)',
+                    borderRadius: 'var(--radius-card)',
+                    overflow: 'hidden',
+                    border: '1px solid var(--color-line-faint)',
+                  }}>
+                    <iframe
+                      src={note.sourceUrl}
+                      style={{ width: '100%', height: 600, border: 'none', display: 'block' }}
+                      sandbox="allow-scripts allow-same-origin allow-forms"
+                      onError={() => setIframeError(true)}
+                    />
+                  </div>
+                ) : (
+                  /* Text view fallback */
+                  <div
+                    style={{
+                      background: 'var(--color-surf-1)',
+                      border: '1px solid var(--color-line-faint)',
+                      borderRadius: 'var(--radius-card)',
+                      padding: 16, fontSize: 12,
+                      color: 'var(--color-text-mid)',
+                      lineHeight: 1.7, whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word', maxHeight: 400, overflowY: 'auto',
+                    }}
+                  >
+                    {iframeError && (
+                      <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--color-failed)' }}>
+                        ⚠ 此網站不允許嵌入顯示，改為顯示擷取的文字
+                      </div>
+                    )}
+                    {note.sourceText ?? note.ocrText ?? '（無文字內容）'}
+                  </div>
+                )}
               </div>
             )}
           </section>

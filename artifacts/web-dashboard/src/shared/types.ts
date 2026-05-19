@@ -1,5 +1,5 @@
 export type AiStatus = 'pending' | 'done' | 'failed';
-export type NoteType = 'text' | 'image' | 'bookmark';
+export type NoteType = 'text' | 'image' | 'bookmark' | 'page';
 
 export interface NoteCard {
   id: string;
