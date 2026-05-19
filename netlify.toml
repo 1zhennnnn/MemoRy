@@ -1,6 +1,17 @@
 [build]
-  command = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @workspace/web-dashboard run build"
+  command = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @workspace/db run build && pnpm --filter @workspace/api-zod run build && pnpm --filter @workspace/web-dashboard run build"
   publish = "artifacts/web-dashboard/dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["pg-native"]
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/*"
