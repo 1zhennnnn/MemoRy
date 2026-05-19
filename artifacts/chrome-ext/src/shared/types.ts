@@ -15,6 +15,7 @@ export interface SaveTextPayload {
   sourceUrl?: string;
   sourceTitle?: string;
   userNote?: string;
+  noteType?: 'text' | 'page';
 }
 
 export type MessageType =

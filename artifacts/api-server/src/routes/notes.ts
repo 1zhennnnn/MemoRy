@@ -172,20 +172,23 @@ router.get("/notes", requireAuth, async (req, res, next) => {
 router.post("/notes/text", requireAuth, async (req, res, next) => {
   try {
     const userId = req.user!.id;
-    const { sourceUrl, sourceTitle, sourceText, userNote } = req.body as {
+    const { sourceUrl, sourceTitle, sourceText, userNote, noteType: rawNoteType } = req.body as {
       sourceUrl?: string;
       sourceTitle?: string;
       sourceText?: string;
       userNote?: string;
+      noteType?: string;
     };
 
     if (!sourceText) {
       throw new AppError("sourceText is required", ERROR_CODES.MISSING_FIELD, 400);
     }
 
+    const noteType = rawNoteType === "page" ? "page" : "text";
+
     const [note] = await db
       .insert(notesTable)
-      .values({ userId, sourceUrl, sourceTitle, sourceText, userNote, noteType: "text", aiStatus: "pending" })
+      .values({ userId, sourceUrl, sourceTitle, sourceText, userNote, noteType, aiStatus: "pending" })
       .returning({ id: notesTable.id, aiStatus: notesTable.aiStatus });
 
     req.log.info({ noteId: note!.id }, "Text note created");

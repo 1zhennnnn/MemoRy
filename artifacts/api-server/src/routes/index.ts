@@ -5,6 +5,7 @@ import searchRouter  from "./search.js";
 import reportsRouter from "./reports.js";
 import tagsRouter    from "./tags.js";
 import exportRouter  from "./export.js";
+import agentRouter   from "./agent.js";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(searchRouter);    // POST /search  GET /search/keyword
 router.use(reportsRouter);   // /reports  /reports/generate  /reports/:date
 router.use(tagsRouter);      // GET /tags
 router.use(exportRouter);    // GET /export
+router.use(agentRouter);     // POST /agent/chat
 
 export default router;

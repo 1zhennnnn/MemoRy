@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/timeline',  label: '時間軸', icon: '📅' },
   { to: '/bookmarks', label: '書籤',   icon: '🔗' },
   { to: '/search',    label: '搜尋',   icon: '🔍' },
+  { to: '/chat',      label: 'AI 助手', icon: '✦' },
   { to: '/reports',   label: '日報',   icon: '📊' },
 ];
 
