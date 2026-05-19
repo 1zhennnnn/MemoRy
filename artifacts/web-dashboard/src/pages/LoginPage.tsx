@@ -95,7 +95,7 @@ export default function LoginPage() {
       >
         {/* Brand */}
         <div style={{ textAlign: 'center' }}>
-          <img src="/logo.svg" alt="MemoRy" style={{ width: 200, height: 132, objectFit: 'contain', marginBottom: 4 }} />
+          <img src="/logo.png" alt="MemoRy" style={{ width: 200, height: 132, objectFit: 'contain', marginBottom: 4 }} />
           <div style={{ fontSize: 12, color: 'var(--color-text-lo)', marginTop: 4 }}>
             AI 碎片化知識管理系統
           </div>
