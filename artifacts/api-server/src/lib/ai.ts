@@ -97,13 +97,18 @@ ${text}`;
 
 export async function ocrImage(imageBase64: string): Promise<string> {
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+  const mimeType = imageBase64.match(/^data:(image\/\w+);base64,/)?.[1] ?? "image/png";
   const res = await geminiPost(GEMINI_VIS_URL, {
     contents: [{ role: "user", parts: [
-      { text: "請提取圖片中的所有文字，只回傳純文字內容，不加任何說明。" },
-      { inline_data: { mime_type: "image/png", data: base64Data } },
+      {
+        text: "請分析這張圖片。如果圖片中有文字，提取所有文字內容。如果沒有文字或文字很少，請描述圖片的主要內容、主題和重要視覺元素。只輸出提取的文字或描述，不加任何說明前綴。",
+      },
+      { inline_data: { mime_type: mimeType, data: base64Data } },
     ]}],
   });
-  return geminiText(await res.json());
+  const text = geminiText(await res.json());
+  if (!text.trim()) throw new Error("Gemini vision returned empty response");
+  return text;
 }
 
 export async function embedText(text: string, _taskType = "RETRIEVAL_DOCUMENT"): Promise<number[]> {

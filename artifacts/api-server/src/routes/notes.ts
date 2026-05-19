@@ -67,7 +67,7 @@ async function triggerOcrAndAiProcessing(noteId: string, imageBase64: string): P
 
     await triggerAiProcessing(noteId, ocrText);
   } catch (err) {
-    logger.error({ err, noteId }, "OCR processing failed");
+    logger.error({ err: err instanceof Error ? err.message : String(err), noteId }, "OCR processing failed");
     await db
       .update(notesTable)
       .set({ aiStatus: "failed", updatedAt: new Date() })

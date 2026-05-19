@@ -106,14 +106,28 @@ Chrome → `chrome://extensions` → 開啟開發者模式 → 載入未封裝�
 
 ## 部署
 
-| 服務 | 平台 | 說明 |
-|------|------|------|
-| API Server | [Railway](https://railway.app) | Build: `pnpm install && pnpm --filter @workspace/api-server run build`<br>Start: `node artifacts/api-server/dist/index.js` |
-| Web Dashboard | [Vercel](https://vercel.com) | Root: `artifacts/web-dashboard`<br>Env: `VITE_API_BASE_URL=<Railway URL>` |
-| Database | [Neon](https://neon.tech) | Serverless PostgreSQL + pgvector |
-| Auth | [Supabase](https://supabase.com) | 設定 OAuth 回調至 Vercel 網址 |
+### API Server
 
-部署後需更新 Chrome Extension 的 `VITE_API_BASE_URL` 至 Railway 網址並重新 build。
+```bash
+pnpm install
+pnpm --filter @workspace/api-server run build
+node artifacts/api-server/dist/index.js
+```
+
+需設定環境變數（參考上方表格），確保 `PORT`、`DATABASE_URL`、`GROQ_API_KEY`、`GEMINI_API_KEY`、`SUPABASE_JWT_SECRET` 均已填入。
+
+### Web Dashboard
+
+```bash
+pnpm --filter @workspace/web-dashboard run build
+# dist/ 輸出至 artifacts/web-dashboard/dist/
+```
+
+設定 `VITE_API_BASE_URL` 指向已部署的 API Server 網址。
+
+### Chrome Extension
+
+部署後需將 `VITE_API_BASE_URL` 改為正式 API 網址並重新 build，再重新載入擴充功能。
 
 ## 技術棧
 
