@@ -31,7 +31,7 @@ app.use(express.static(path.join(__dirname, "dist")));
 
 // 3. 捕捉所有未匹配的路徑，全部導向前端首頁
 // 這樣你的 React/Vue Router (例如 /about, /login) 重新整理時才不會報錯 404
-app.get("*", (req, res) => {
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
