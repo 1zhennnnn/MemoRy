@@ -11,13 +11,17 @@ const PREFETCH: Record<string, () => void> = {
 };
 
 const NAV_ITEMS = [
-  { to: '/graph',     label: '知識星座圖', icon: 'graph'    },
-  { to: '/timeline',  label: '時間軸',   icon: 'calendar' },
-  { to: '/chat',      label: 'AI 助手',  icon: 'sparkle'  },
-  { to: '/reports',   label: '日報',     icon: 'report'   },
+  { to: '/graph',    label: '知識星座圖', icon: 'graph'    },
+  { to: '/timeline', label: '時間軸',     icon: 'calendar' },
+  { to: '/reports',  label: '日報',       icon: 'report'   },
 ] as const;
 
-export default function Sidebar() {
+interface SidebarProps {
+  chatOpen: boolean;
+  onChatToggle: () => void;
+}
+
+export default function Sidebar({ chatOpen, onChatToggle }: SidebarProps) {
   const email = getUserEmail() ?? '';
 
   return (
@@ -59,6 +63,16 @@ export default function Sidebar() {
             <span>{label}</span>
           </NavLink>
         ))}
+
+        {/* AI 助手：在側欄開啟抽屜 */}
+        <button
+          onClick={onChatToggle}
+          className={`nav-item${chatOpen ? ' active' : ''}`}
+          style={{ width: '100%', background: 'none', border: chatOpen ? undefined : 'none', cursor: 'pointer', textAlign: 'left' }}
+        >
+          <Icon name="sparkle" size={14} />
+          <span>AI 助手</span>
+        </button>
       </nav>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
