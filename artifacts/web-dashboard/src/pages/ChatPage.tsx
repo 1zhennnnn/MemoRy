@@ -23,6 +23,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingConvs, setLoadingConvs] = useState(true);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,11 +50,22 @@ export default function ChatPage() {
     setMessages([]);
   }
 
-  async function deleteConversation(id: string, e: React.MouseEvent) {
+  function requestDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation();
+    setPendingDelete(id);
+  }
+
+  async function confirmDelete(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setPendingDelete(null);
     await api.agent.deleteConversation(id);
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeId === id) { setActiveId(null); setMessages([]); }
+  }
+
+  function cancelDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    setPendingDelete(null);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -124,10 +136,23 @@ export default function ChatPage() {
             border: activeId === c.id ? '1px solid var(--color-signal-border)' : '1px solid transparent',
           }}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.title}</span>
-            <button onClick={(e) => void deleteConversation(c.id, e)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-lo)', fontSize: 11, padding: 0, flexShrink: 0 }}>
-              <Icon name="close" size={11} />
-            </button>
+            {pendingDelete === c.id ? (
+              <span style={{ display: 'flex', gap: 3, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                <button onClick={(e) => void confirmDelete(c.id, e)}
+                  style={{ background: 'rgba(240,80,104,0.12)', border: '1px solid var(--color-failed)', borderRadius: 4, cursor: 'pointer', color: 'var(--color-failed)', fontSize: 10, padding: '1px 5px', lineHeight: 1.4 }}>
+                  刪除
+                </button>
+                <button onClick={cancelDelete}
+                  style={{ background: 'none', border: '1px solid var(--color-line-faint)', borderRadius: 4, cursor: 'pointer', color: 'var(--color-text-lo)', fontSize: 10, padding: '1px 5px', lineHeight: 1.4 }}>
+                  取消
+                </button>
+              </span>
+            ) : (
+              <button onClick={(e) => requestDelete(c.id, e)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-lo)', fontSize: 11, padding: 0, flexShrink: 0 }}>
+                <Icon name="close" size={11} />
+              </button>
+            )}
           </div>
         ))}
       </div>
