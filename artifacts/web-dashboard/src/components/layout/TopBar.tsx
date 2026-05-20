@@ -31,6 +31,7 @@ export default function TopBar() {
         {/* Mode toggle */}
         <div style={{
           display: 'flex',
+          height: 36, boxSizing: 'border-box',
           background: 'var(--color-surf-2)',
           border: '1px solid var(--color-line-faint)',
           borderRight: 'none',
@@ -45,7 +46,7 @@ export default function TopBar() {
               onClick={() => setMode(m)}
               style={{
                 padding: '0 10px',
-                height: 36,
+                height: '100%',
                 border: 'none',
                 borderRight: '1px solid var(--color-line-faint)',
                 cursor: 'pointer',

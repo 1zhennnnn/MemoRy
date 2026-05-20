@@ -1,4 +1,6 @@
 export type AiStatus = 'pending' | 'done' | 'failed';
+
+export interface Highlight { start: number; end: number; color: string; }
 export type NoteType = 'text' | 'image' | 'bookmark' | 'page';
 
 export interface NoteCard {
@@ -18,6 +20,7 @@ export interface NoteDetail extends NoteCard {
   sourceText: string | null;
   ocrText: string | null;
   userNote: string | null;
+  highlights: Highlight[];
   relatedNotes: NoteCard[];
 }
 

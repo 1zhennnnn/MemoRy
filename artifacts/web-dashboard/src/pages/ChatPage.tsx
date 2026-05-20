@@ -182,7 +182,14 @@ export default function ChatPage() {
                 borderRadius: msg.role === 'user' ? 12 : '0 12px 12px 12px',
                 padding: '10px 14px', fontSize: 13, color: 'var(--color-text-hi)', lineHeight: 1.7,
               }}>
-                {msg.role === 'user' ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
+                {msg.role === 'user' ? msg.content : (
+                  <ReactMarkdown components={{
+                    ul: ({ children }) => <ul style={{ paddingLeft: '1.4em', margin: '4px 0' }}>{children}</ul>,
+                    ol: ({ children }) => <ol style={{ paddingLeft: '1.4em', margin: '4px 0' }}>{children}</ol>,
+                    li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
+                    p:  ({ children }) => <p  style={{ margin: '4px 0' }}>{children}</p>,
+                  }}>{msg.content}</ReactMarkdown>
+                )}
               </div>
 
               {msg.webSources && msg.webSources.length > 0 && (
@@ -201,20 +208,25 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {msg.sources && msg.sources.length > 0 && (
+              {msg.sources && msg.sources.filter((s) => (s.score ?? 0) >= 0.5).length > 0 && (() => {
+                const relevant = msg.sources.filter((s) => (s.score ?? 0) >= 0.5);
+                return (
                 <div style={{ alignSelf: 'flex-start', maxWidth: '85%', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-lo)', marginLeft: 4 }}>引用 {msg.sources.length} 筆筆記</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-lo)', marginLeft: 4 }}>引用 {relevant.length} 筆相關筆記</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {msg.sources.map((s, si) => (
+                    {relevant.map((s, si) => (
                       <Link key={s.id} to={`/notes/${s.id}`} style={{
                         fontSize: 11, padding: '3px 8px', background: 'var(--color-surf-2)',
                         border: '1px solid var(--color-line-faint)', borderRadius: 6,
                         color: 'var(--color-text-mid)', textDecoration: 'none',
-                      }}>[{si + 1}] {s.title ?? '無標題'}</Link>
+                      }} title={`相似度 ${Math.round((s.score ?? 0) * 100)}%`}>
+                        [{si + 1}] {s.title ?? '無標題'}
+                      </Link>
                     ))}
                   </div>
                 </div>
-              )}
+                );
+              })()}
             </div>
           ))}
 

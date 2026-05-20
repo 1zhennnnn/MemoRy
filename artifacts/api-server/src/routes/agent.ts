@@ -19,7 +19,7 @@ const AGENT_MODELS = [
 
 interface NoteSource { id: string; title: string | null; summary: string | null; score?: number; }
 
-async function searchNotes(userId: string, query: string, topK = 6): Promise<{ notes: NoteSource[]; text: string }> {
+async function searchNotes(userId: string, query: string, topK = 5): Promise<{ notes: NoteSource[]; text: string }> {
   try {
     const queryVector = await embedText(query);
     if (!queryVector.length) return { notes: [], text: "（無嵌入向量）" };
@@ -32,7 +32,7 @@ async function searchNotes(userId: string, query: string, topK = 6): Promise<{ n
         WHERE user_id = ${userId}
           AND embedding IS NOT NULL
           AND ai_status = 'done'
-          AND (embedding <=> ${vectorStr}::vector) < 0.75
+          AND (embedding <=> ${vectorStr}::vector) < 0.5
         ORDER BY distance ASC LIMIT ${topK}
       `,
     );

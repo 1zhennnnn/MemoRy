@@ -9,13 +9,14 @@ import Icon from '../components/common/Icon';
 
 interface GNode { id: string; title: string | null; summary: string | null; tags: string[]; }
 interface GEdge { source: string; target: string; type: 'tag' | 'semantic'; weight: number; }
-interface SimNode extends GNode { x: number; y: number; vx: number; vy: number; r: number; }
+interface SimNode extends GNode { x: number; y: number; vx: number; vy: number; r: number; degree: number; }
 interface HoverInfo {
   id: string; title: string | null; summary: string | null;
   tags: string[]; degree: number; tagDeg: number; semDeg: number;
-  sx: number; sy: number;  // screen coords for card
+  sx: number; sy: number;
 }
 interface Transform { s: number; x: number; y: number; }
+interface Star { x: number; y: number; r: number; base: number; phase: number; }
 
 // ── Simulation ────────────────────────────────────────────────────────────────
 
@@ -32,10 +33,65 @@ function tagHue(s: string): number {
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
   return (h >>> 0) % 360;
 }
+// Lower saturation for constellation aesthetic
 function nodeColor(tags: string[], a = 1) {
-  return tags.length ? `hsla(${tagHue(tags[0]!)},55%,58%,${a})` : `rgba(80,80,80,${a})`;
+  return tags.length ? `hsla(${tagHue(tags[0]!)},38%,62%,${a})` : `rgba(80,88,108,${a})`;
 }
 function nodeR(degree: number) { return Math.max(5, Math.min(18, 5 + Math.log1p(degree) * 3.2)); }
+
+// ── Stars ─────────────────────────────────────────────────────────────────────
+
+function initStars(w: number, h: number, count = 200): Star[] {
+  return Array.from({ length: count }, () => ({
+    x: Math.random() * w, y: Math.random() * h,
+    r: Math.random() * 1.3 + 0.15,
+    base: Math.random() * 0.32 + 0.04,
+    phase: Math.random() * Math.PI * 2,
+  }));
+}
+
+function drawStars(ctx: CanvasRenderingContext2D, stars: Star[], t: number) {
+  for (const s of stars) {
+    const opacity = s.base * (0.65 + 0.35 * Math.sin(t * 0.0008 + s.phase));
+    if (s.r > 0.9) {
+      // Subtle glow for larger stars
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 4, 0, Math.PI * 2);
+      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4);
+      g.addColorStop(0, `rgba(180,215,255,${opacity * 0.18})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(200,222,255,${opacity})`;
+    ctx.fill();
+  }
+}
+
+// ── Ring (Saturn-style halo for high-degree nodes) ────────────────────────────
+
+function drawRing(ctx: CanvasRenderingContext2D, n: SimNode, t: number) {
+  const angle = (t * 0.00022) % (Math.PI * 2);
+  const rx = n.r * 2.5, ry = n.r * 0.5;
+  ctx.save();
+  ctx.translate(n.x, n.y);
+  ctx.rotate(angle);
+  // Outer ring
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(100,210,255,0.3)';
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+  // Inner ring (slightly smaller, more transparent)
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx * 0.78, ry * 0.78, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(140,225,255,0.18)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+}
 
 function tick(nodes: SimNode[], edges: GEdge[], map: Record<string, SimNode>, w: number, h: number, alpha: number) {
   const cx = w / 2, cy = h / 2;
@@ -74,14 +130,18 @@ function draw(
   nodes: SimNode[], edges: GEdge[], map: Record<string, SimNode>,
   t: Transform, worldMx: number | null, worldMy: number | null,
   filterIds: Set<string>,
+  stars: Star[], time: number, ringThreshold: number,
 ): SimNode | null {
   const w = ctx.canvas.width, h = ctx.canvas.height;
 
-  // Clear in screen space
+  // Clear (let CSS background show through, respects theme)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  // All subsequent drawing in world space
+  // Stars in screen space (fixed, parallax)
+  drawStars(ctx, stars, time);
+
+  // World space
   ctx.setTransform(t.s, 0, 0, t.s, t.x, t.y);
 
   // Find hovered
@@ -105,7 +165,12 @@ function draw(
     }
   }
 
-  // Edges
+  // Rings (draw before edges so they appear behind)
+  for (const n of nodes) {
+    if (n.degree > ringThreshold) drawRing(ctx, n, time);
+  }
+
+  // Edges — tag edges → cyan constellation lines
   for (const e of edges) {
     const a = map[e.source], b = map[e.target];
     if (!a || !b) continue;
@@ -114,19 +179,19 @@ function draw(
       : !hasFilter || filterIds.has(e.source) || filterIds.has(e.target);
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
     if (e.type === 'tag') {
-      ctx.strokeStyle = lit ? 'rgba(0,230,120,0.55)' : 'rgba(0,230,120,0.05)';
-      ctx.lineWidth = lit ? 2 : 0.8;
+      ctx.strokeStyle = lit ? 'rgba(0,200,220,0.55)' : 'rgba(0,200,220,0.12)';
+      ctx.lineWidth = lit ? 1.8 : 0.6;
       ctx.setLineDash([]);
     } else {
-      ctx.strokeStyle = lit ? 'rgba(140,130,220,0.45)' : 'rgba(140,130,220,0.04)';
-      ctx.lineWidth = lit ? 1.2 : 0.5;
+      ctx.strokeStyle = lit ? 'rgba(120,120,200,0.38)' : 'rgba(120,120,200,0.09)';
+      ctx.lineWidth = lit ? 1 : 0.5;
       ctx.setLineDash([4, 6]);
     }
     ctx.stroke();
   }
   ctx.setLineDash([]);
 
-  // Nodes — hover takes priority over filter
+  // Nodes
   const sorted = (hov || hasFilter)
     ? [...nodes].sort((a) => (a.id === hov?.id ? 1 : (nbrs.has(a.id) || filterIds.has(a.id)) ? 0 : -1))
     : nodes;
@@ -134,39 +199,50 @@ function draw(
     const isHov = hov?.id === n.id;
     const isNbr = nbrs.has(n.id);
     const isMatch = filterIds.has(n.id);
-    // dim: hover mode dims non-neighbours; filter mode dims non-matches (unless hovering)
     const dim = hov ? (!isHov && !isNbr) : (hasFilter && !isMatch);
-    const r = isHov ? n.r * 2.2 : (isNbr || isMatch) ? n.r * 1.3 : n.r;
-    const a = dim ? 0.15 : 1;
+    // Dim nodes shrink slightly + fade — like distant stars, not invisible
+    const r = isHov ? n.r * 2.2 : (isNbr || isMatch) ? n.r * 1.25 : dim ? n.r * 0.82 : n.r;
+    const alpha = dim ? 0.42 : 1;     // 0.42 keeps the "star field" visible behind focus
 
-    // Glow
+    // Hover glow (star-like radial)
     if (isHov) {
-      ctx.beginPath(); ctx.arc(n.x, n.y, r + 10, 0, Math.PI * 2);
-      ctx.fillStyle = nodeColor(n.tags, 0.12); ctx.fill();
-      ctx.beginPath(); ctx.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
-      ctx.fillStyle = nodeColor(n.tags, 0.22); ctx.fill();
+      const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r + 18);
+      g.addColorStop(0, nodeColor(n.tags, 0.3));
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(n.x, n.y, r + 18, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
     }
 
-    // Fill
+    // Node fill
     ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = isHov ? '#fff' : nodeColor(n.tags, a);
+    ctx.fillStyle = isHov ? 'rgba(240,248,255,0.95)' : nodeColor(n.tags, alpha);
     ctx.fill();
-    ctx.strokeStyle = isHov ? 'rgba(255,255,255,0.9)' : `rgba(255,255,255,${dim ? 0.06 : 0.28})`;
-    ctx.lineWidth = isHov ? 2 : 0.8;
+    // Rim light — dim nodes still get a faint rim so they look like distant stars
+    ctx.strokeStyle = isHov
+      ? 'rgba(180,230,255,0.9)'
+      : n.tags.length
+        ? `hsla(${tagHue(n.tags[0]!)},60%,85%,${dim ? 0.18 : 0.35})`
+        : `rgba(180,195,220,${dim ? 0.12 : 0.22})`;
+    ctx.lineWidth = isHov ? 2 : 0.7;
     ctx.stroke();
 
-    // Label (visible when hovered or large & not dim)
-    const showLabel = isHov || (!dim && n.r >= 10);
+    // Label — dim nodes show faint label if large enough (distant star names)
+    const showLabel = isHov || (!dim && n.r >= 10) || (dim && n.r >= 14);
     if (showLabel && n.title) {
       const label = n.title.length > 16 ? n.title.slice(0, 15) + '…' : n.title;
+      const isDark = document.documentElement.dataset.theme !== 'light';
       ctx.font = `${isHov ? 600 : 400} ${isHov ? 12 : 10}px -apple-system,sans-serif`;
-      ctx.fillStyle = isHov ? 'rgba(255,255,255,0.95)' : `rgba(210,220,240,${dim ? 0.1 : 0.65})`;
+      if (isDark) {
+        ctx.fillStyle = isHov ? 'rgba(220,240,255,0.95)' : `rgba(190,210,235,${dim ? 0.28 : 0.65})`;
+      } else {
+        // Light mode: dark text with slight contrast
+        ctx.fillStyle = isHov ? 'rgba(10,20,50,0.95)' : `rgba(30,45,80,${dim ? 0.45 : 0.82})`;
+      }
       ctx.textAlign = 'center';
       ctx.fillText(label, n.x, n.y + r + 14);
     }
   }
 
-  // Reset transform
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   return hov;
 }
@@ -183,9 +259,13 @@ export default function GraphPage() {
   const mouseRef   = useRef<{ x: number; y: number } | null>(null);
   const hovRef     = useRef<SimNode | null>(null);
   const tRef       = useRef<Transform>({ s: 1, x: 0, y: 0 });
-  const dragRef    = useRef<{ sx: number; sy: number; tx: number; ty: number; moved: boolean } | null>(null);
+  const dragRef     = useRef<{ sx: number; sy: number; tx: number; ty: number; moved: boolean } | null>(null);
+  const nodeDragRef = useRef<{ nodeId: string; moved: boolean; startX: number; startY: number } | null>(null);
 
-  const filterIdsRef = useRef<Set<string>>(new Set());
+  const filterIdsRef      = useRef<Set<string>>(new Set());
+  const starsRef          = useRef<Star[]>([]);
+  const timeRef           = useRef(0);
+  const ringThresholdRef  = useRef(0);
 
   const [hover, setHover]         = useState<HoverInfo | null>(null);
   const [loading, setLoading]     = useState(true);
@@ -215,12 +295,20 @@ export default function GraphPage() {
       const nodes: SimNode[] = data.nodes.map((n) => {
         const deg = (degrees[n.id]?.tag ?? 0) + (degrees[n.id]?.sem ?? 0);
         return {
-          ...n, r: nodeR(deg),
+          ...n, r: nodeR(deg), degree: deg,
           x: w / 2 + (Math.random() - 0.5) * Math.min(w, h) * 0.75,
           y: h / 2 + (Math.random() - 0.5) * Math.min(w, h) * 0.75,
           vx: 0, vy: 0,
         };
       });
+      // 70th-percentile degree → ring threshold
+      const sorted70 = [...nodes].map((n) => n.degree).sort((a, b) => a - b);
+      const ringThreshold = sorted70[Math.floor(sorted70.length * 0.7)] ?? 0;
+      ringThresholdRef.current = ringThreshold;
+
+      // Init stars (screen-space background)
+      starsRef.current = initStars(w, h);
+
       const map: Record<string, SimNode> = {};
       for (const n of nodes) map[n.id] = n;
       simRef.current = { nodes, edges: data.edges, map, alpha: 1, degrees };
@@ -246,7 +334,11 @@ export default function GraphPage() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+    const resize = () => {
+      canvas.width  = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      starsRef.current = initStars(canvas.width, canvas.height);
+    };
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
@@ -268,12 +360,29 @@ export default function GraphPage() {
         sim.alpha *= ALPHA_DECAY;
       }
 
+      // Pin dragged node to mouse (after tick so forces don't override)
+      const nd = nodeDragRef.current;
+      if (nd && sim && mouseRef.current) {
+        const tt = tRef.current;
+        const n = sim.map[nd.nodeId];
+        if (n) {
+          n.x = (mouseRef.current.x - tt.x) / tt.s;
+          n.y = (mouseRef.current.y - tt.y) / tt.s;
+          n.vx = 0; n.vy = 0;
+          sim.alpha = Math.max(sim.alpha, 0.35); // keep graph alive while dragging
+        }
+      }
+
       if (sim) {
         const m = mouseRef.current;
         const t = tRef.current;
         const wx = m ? (m.x - t.x) / t.s : null;
         const wy = m ? (m.y - t.y) / t.s : null;
-        const hov = draw(ctx, sim.nodes, sim.edges, sim.map, t, wx, wy, filterIdsRef.current);
+        timeRef.current += 1;
+        const hov = draw(
+          ctx, sim.nodes, sim.edges, sim.map, t, wx, wy,
+          filterIdsRef.current, starsRef.current, timeRef.current, ringThresholdRef.current,
+        );
 
         if (hov?.id !== hovRef.current?.id) {
           hovRef.current = hov ?? null;
@@ -323,20 +432,28 @@ export default function GraphPage() {
     const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
     const t = tRef.current;
     const wx = (sx - t.x) / t.s, wy = (sy - t.y) / t.s;
-    // Only start pan if not on a node
     const sim = simRef.current;
     if (sim) {
       for (const n of sim.nodes) {
-        if ((wx - n.x) ** 2 + (wy - n.y) ** 2 < (n.r * 2.5) ** 2) return;
+        if ((wx - n.x) ** 2 + (wy - n.y) ** 2 < (n.r * 2.5) ** 2) {
+          // Start node drag — record start position for moved detection
+          nodeDragRef.current = { nodeId: n.id, moved: false, startX: sx, startY: sy };
+          return;
+        }
       }
     }
+    // Start pan drag
     dragRef.current = { sx, sy, tx: t.x, ty: t.y, moved: false };
   }
   function onMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
     mouseRef.current = { x: sx, y: sy };
-    if (dragRef.current) {
+    if (nodeDragRef.current) {
+      // Compare against mousedown start position (not previous move event)
+      const dx = sx - nodeDragRef.current.startX, dy = sy - nodeDragRef.current.startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) nodeDragRef.current.moved = true;
+    } else if (dragRef.current) {
       const dx = sx - dragRef.current.sx, dy = sy - dragRef.current.sy;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragRef.current.moved = true;
       if (dragRef.current.moved) {
@@ -345,10 +462,21 @@ export default function GraphPage() {
     }
   }
   function onMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
+    // Node drag end
+    const nd = nodeDragRef.current;
+    if (nd) {
+      nodeDragRef.current = null;
+      if (!nd.moved) {
+        // Was a click, not a drag — navigate
+        navigate(`/notes/${nd.nodeId}`);
+      }
+      return;
+    }
+    // Pan drag end
     const d = dragRef.current;
     dragRef.current = null;
-    if (d?.moved) return; // was a pan, not a click
-    // Check node click
+    if (d?.moved) return;
+    // Tap on empty canvas — check node hit one more time
     const sim = simRef.current;
     if (!sim) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -357,12 +485,14 @@ export default function GraphPage() {
     const wx = (sx - t.x) / t.s, wy = (sy - t.y) / t.s;
     for (const n of sim.nodes) {
       if ((wx - n.x) ** 2 + (wy - n.y) ** 2 < (n.r * 2.5) ** 2) {
-        navigate(`/notes/${n.id}`);
-        return;
+        navigate(`/notes/${n.id}`); return;
       }
     }
   }
-  function onMouseLeave() { mouseRef.current = null; hovRef.current = null; setHover(null); dragRef.current = null; }
+  function onMouseLeave() {
+    mouseRef.current = null; hovRef.current = null; setHover(null);
+    dragRef.current = null; nodeDragRef.current = null;
+  }
 
   // ── Search ────────────────────────────────────────────────────────────────
 
@@ -459,7 +589,8 @@ export default function GraphPage() {
 
       <canvas
         ref={canvasRef}
-        style={{ width: '100%', height: '100%', display: 'block', cursor: dragRef.current?.moved ? 'grabbing' : hover ? 'pointer' : 'grab' }}
+        style={{ width: '100%', height: '100%', display: 'block',
+          cursor: (nodeDragRef.current?.moved || dragRef.current?.moved) ? 'grabbing' : hover ? 'grab' : 'default' }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
@@ -475,30 +606,30 @@ export default function GraphPage() {
           borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
           padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8,
         }}>
-          {/* Tabs + close */}
+          {/* Single-row: [關鍵字|語意] + input + actions + close */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {(['keyword', 'semantic'] as const).map((m) => (
-              <button key={m} onClick={() => switchMode(m)} style={{
-                padding: '3px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                border: '1px solid',
-                background: searchMode === m ? 'var(--color-signal-dim)' : 'transparent',
-                borderColor: searchMode === m ? 'var(--color-signal-border)' : 'var(--color-line-faint)',
-                color: searchMode === m ? 'var(--color-signal-light)' : 'var(--color-text-lo)',
-              }}>
-                {m === 'keyword' ? '關鍵字' : '語意'}
-              </button>
-            ))}
-            <span style={{ flex: 1, fontSize: 11, color: 'var(--color-text-lo)', paddingLeft: 4 }}>
-              {searchMode === 'keyword' ? '比對標題 / tag，即時過濾' : '語意搜尋，按 Enter 觸發'}
-            </span>
-            <button onClick={() => { setSearchOpen(false); clearSearch(); }} style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--color-text-lo)', fontSize: 16, padding: '0 2px',
-            }}>✕</button>
-          </div>
+            {/* Mode toggle — LEFT of input, 關鍵字 first / 語意 second */}
+            <div style={{
+              display: 'flex', flexShrink: 0,
+              height: 32, boxSizing: 'border-box',
+              background: 'var(--color-surf-1)',
+              border: '1px solid var(--color-line-faint)',
+              borderRadius: 7, overflow: 'hidden',
+            }}>
+              {(['keyword', 'semantic'] as const).map((m) => (
+                <button key={m} onClick={() => switchMode(m)} style={{
+                  padding: '0 10px', height: '100%', fontSize: 12, cursor: 'pointer',
+                  border: 'none', borderRight: m === 'keyword' ? '1px solid var(--color-line-faint)' : 'none',
+                  background: searchMode === m ? 'var(--color-signal-dim)' : 'transparent',
+                  color: searchMode === m ? 'var(--color-signal-light)' : 'var(--color-text-lo)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {m === 'keyword' ? '關鍵字' : '語意'}
+                </button>
+              ))}
+            </div>
 
-          {/* Input */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {/* Input */}
             <div style={{ position: 'relative', flex: 1 }}>
               <Icon name="search" size={13} style={{
                 position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
@@ -507,20 +638,25 @@ export default function GraphPage() {
               <input
                 autoFocus
                 className="input-field"
-                style={{ width: '100%', paddingLeft: 28, fontSize: 13 }}
-                placeholder={searchMode === 'keyword' ? '搜尋標題或 tag…' : '輸入問題，Enter 搜尋…'}
+                style={{ width: '100%', paddingLeft: 28, height: 32, fontSize: 13 }}
+                placeholder={searchMode === 'keyword' ? '搜尋標題或 tag…' : '輸入問題後按 Enter…'}
                 value={searchQ}
                 onChange={(e) => onSearchChange(e.target.value)}
                 onKeyDown={onSearchKey}
               />
             </div>
+
             {searching && <Spinner size={14} />}
             {searchMode === 'semantic' && !searching && (
-              <button className="btn-primary" style={{ fontSize: 12, padding: '0 12px', height: 32 }}
+              <button className="btn-primary" style={{ fontSize: 12, padding: '0 12px', height: 32, flexShrink: 0 }}
                 onClick={() => void doSemantic(searchQ)}>
                 搜尋
               </button>
             )}
+            <button onClick={() => { setSearchOpen(false); clearSearch(); }} style={{
+              background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0,
+              color: 'var(--color-text-lo)', fontSize: 16, padding: '0 2px',
+            }}>✕</button>
           </div>
 
           {/* Status */}
@@ -604,7 +740,7 @@ export default function GraphPage() {
             )}
             <div style={{ fontSize: 10, color: 'var(--color-text-lo)', display: 'flex', gap: 10, alignItems: 'center' }}>
               <span>● {hover.degree} 連結</span>
-              {hover.tagDeg > 0 && <span style={{ color: 'rgba(0,220,110,0.8)' }}>tag×{hover.tagDeg}</span>}
+              {hover.tagDeg > 0 && <span style={{ color: 'rgba(0,210,225,0.9)' }}>tag×{hover.tagDeg}</span>}
               {hover.semDeg > 0 && <span style={{ color: 'rgba(150,140,230,0.9)' }}>語意×{hover.semDeg}</span>}
             </div>
           </div>
@@ -616,7 +752,7 @@ export default function GraphPage() {
         <div style={{ position: 'absolute', bottom: 14, left: 16, display: 'flex', gap: 14, fontSize: 11, color: 'var(--color-text-lo)' }}>
           <span>{stats.nodes} 筆記</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 12, height: 2, background: 'rgba(0,230,120,0.7)', display: 'inline-block', verticalAlign: 'middle' }} />
+            <span style={{ width: 12, height: 2, background: 'rgba(0,210,225,0.8)', display: 'inline-block', verticalAlign: 'middle' }} />
             {stats.tagEdges} tag
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
