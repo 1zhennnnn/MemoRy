@@ -10,9 +10,9 @@ if (!connectionString) {
 const isPgBouncer = connectionString.includes("pgbouncer=true");
 const client = postgres(connectionString, {
   max: 10,
-  idle_timeout: 20,        // release idle connections after 20s
-  connect_timeout: 10,     // fail fast if can't connect
-  prepare: !isPgBouncer,   // PgBouncer transaction mode requires prepare:false
+  idle_timeout: 60,        // keep connections alive for 60s
+  connect_timeout: 5,      // fail fast (don't hang for 10s)
+  prepare: !isPgBouncer,
 });
 export const db = drizzle(client, { schema });
 

@@ -22,10 +22,17 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    envDir: path.resolve(__dirname, "../../"),  // read .env from workspace root
+    esbuild: {
+      jsxDev: false,  // force production JSX (jsx-runtime, not jsx-dev-runtime)
+    },
     build: {
       outDir: "dist",
     },
     define: {
+      // Force production React build in all sub-bundles (vite-plugin-web-extension
+      // creates child Vite instances that don't always inherit NODE_ENV=production)
+      "process.env.NODE_ENV": JSON.stringify("production"),
       __API_BASE_URL__: JSON.stringify(
         env["VITE_API_BASE_URL"] ?? "http://localhost:5000"
       ),

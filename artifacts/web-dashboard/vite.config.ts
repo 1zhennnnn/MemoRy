@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
   },
+  envDir: path.resolve(__dirname, "../../"),  // read .env from workspace root
   server: { port: 3000 },
   build: { outDir: "dist" },
 });

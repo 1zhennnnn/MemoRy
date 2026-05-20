@@ -63,8 +63,28 @@ async function geminiPost(url: string, body: object, retries = 2): Promise<Respo
 }
 
 function geminiText(data: unknown): string {
-  const d = data as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  return d.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const d = data as { candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }> };
+  const parts = d.candidates?.[0]?.content?.parts ?? [];
+  return parts.filter((p) => p.text && !p.thought).map((p) => p.text!).join("").trim() ?? "";
+}
+
+// ── Unified text generation (Groq → Gemini fallback) ─────────────────────────
+
+async function chatGenerate(messages: ChatMessage[], jsonMode = false): Promise<string> {
+  // Try Groq first (faster), fall back to Gemini
+  if (GROQ_KEY) return groqChat(messages, jsonMode);
+
+  if (!GOOGLE_KEY) throw new AppError("No AI key configured (need GROQ_API_KEY or GEMINI_API_KEY)", ERROR_CODES.AI_ERROR, 500);
+
+  const system = messages.find((m) => m.role === "system")?.content ?? "";
+  const userMsgs = messages.filter((m) => m.role !== "system");
+  const body: Record<string, unknown> = {
+    system_instruction: { parts: [{ text: system }] },
+    contents: userMsgs.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+  };
+  if (jsonMode) body["generationConfig"] = { responseMimeType: "application/json" };
+  const res = await geminiPost(GEMINI_VIS_URL, body);
+  return geminiText(await res.json());
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -75,22 +95,44 @@ export interface SummarizeResult {
   tags: string[];
 }
 
-export async function summarizeText(text: string): Promise<SummarizeResult> {
-  const prompt = `請分析以下文字，輸出 JSON（不含 Markdown 代碼塊）：
-{"title":"簡短標題","summary":"3-5句摘要","tags":["標籤1","標籤2"]}
+export async function summarizeText(
+  text: string,
+  ctx?: { sourceTitle?: string | null; sourceUrl?: string | null },
+): Promise<SummarizeResult> {
+  const truncated = text.length > 4000 ? text.slice(0, 4000) + "…" : text;
+  const ctxHint = [
+    ctx?.sourceTitle ? `頁面標題：${ctx.sourceTitle}` : "",
+    ctx?.sourceUrl   ? `來源網址：${ctx.sourceUrl}`   : "",
+  ].filter(Boolean).join("\n");
 
-${text}`;
+  const prompt = `請分析以下內容，輸出 JSON（不含 Markdown 代碼塊）：
+{"title":"精確簡短的標題（10-20字）","summary":"3-5句完整摘要，說明核心內容","tags":["標籤1","標籤2","標籤3"]}
 
-  const raw = await groqChat([
-    { role: "system", content: "你是一個知識整理助手。請用繁體中文回應。只輸出合法 JSON，不含任何說明文字。" },
+規則：
+- title 必須精確反映內容主題，不要太籠統（例如「如何使用 RAG 提升 LLM 準確性」比「AI 技術」好）
+- summary 要完整說明重點，不要只是重複標題
+- tags 選擇最相關的 2-4 個關鍵詞
+${ctxHint ? `\n${ctxHint}\n` : ""}
+內容：
+${truncated}`;
+
+  const raw = await chatGenerate([
+    { role: "system", content: "你是知識整理助手，請用繁體中文回應，只輸出合法 JSON，不含任何說明文字。" },
     { role: "user", content: prompt },
   ], true);
 
   try {
-    return JSON.parse(raw) as SummarizeResult;
+    const parsed = JSON.parse(raw) as SummarizeResult;
+    if (parsed.title && parsed.summary) return parsed;
+    throw new Error("missing fields");
   } catch {
     const match = raw.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]) as SummarizeResult;
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[0]) as SummarizeResult;
+        if (parsed.title) return parsed;
+      } catch { /* fall through */ }
+    }
     throw new AppError("AI 回傳格式錯誤", ERROR_CODES.AI_ERROR, 500);
   }
 }
@@ -127,7 +169,7 @@ export async function ragAnswer(query: string, contexts: RagContext[]): Promise<
   const contextText = contexts
     .map((c, i) => `[${i + 1}] ${c.title}\n${c.summary}`)
     .join("\n\n");
-  return groqChat([
+  return chatGenerate([
     {
       role: "system",
       content:
@@ -146,15 +188,23 @@ export async function ragAnswer(query: string, contexts: RagContext[]): Promise<
 export interface ReportNote { title: string; summary: string; tags: string[]; }
 export interface DailyReportResult { keyLearnings: string[]; crossDomain: string; suggestions: string[]; }
 
-export async function generateDailyReport(notes: ReportNote[]): Promise<DailyReportResult> {
-  const notesText = notes.map((n) => `- ${n.title}: ${n.summary} [${n.tags.join(", ")}]`).join("\n");
-  const prompt = `分析今日筆記，輸出 JSON（不含 Markdown 代碼塊）：
-{"keyLearnings":["要點1","要點2"],"crossDomain":"跨域分析","suggestions":["建議1","建議2"]}
+export async function generateDailyReport(
+  notes: ReportNote[],
+  relatedNotes?: ReportNote[],
+): Promise<DailyReportResult> {
+  const todayText = notes.map((n) => `- ${n.title}: ${n.summary} [${n.tags.join(", ")}]`).join("\n");
+  const historicalSection = relatedNotes?.length
+    ? `\n\n## 歷史相關筆記（供跨域聯想參考）\n${relatedNotes.map((n) => `- ${n.title}: ${n.summary} [${n.tags.join(", ")}]`).join("\n")}`
+    : "";
 
-${notesText}`;
+  const prompt = `分析今日學習，輸出 JSON（不含 Markdown 代碼塊）：
+{"keyLearnings":["今日要點1","今日要點2"],"crossDomain":"跨域聯想（結合今日筆記與歷史筆記，找出跨領域的連結與洞見）","suggestions":["建議1","建議2"]}
 
-  const raw = await groqChat([
-    { role: "system", content: "你是一個學習分析助手。請用繁體中文回應。只輸出合法 JSON，不含任何說明文字。" },
+## 今日筆記
+${todayText}${historicalSection}`;
+
+  const raw = await chatGenerate([
+    { role: "system", content: "你是學習分析助手，請用繁體中文回應，只輸出合法 JSON，不含任何說明文字。" },
     { role: "user", content: prompt },
   ], true);
 

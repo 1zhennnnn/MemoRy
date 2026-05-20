@@ -77,8 +77,11 @@ export async function requireAuth(
       } catch (verifyErr) {
         const isNetworkError =
           verifyErr instanceof Error &&
-          (verifyErr.message.includes("fetch") ||
+          (verifyErr.message.includes("timed out") ||
+            verifyErr.message.includes("fetch") ||
             verifyErr.message.includes("network") ||
+            (verifyErr as { code?: string }).code === "ERR_JWKS_TIMEOUT" ||
+            verifyErr.constructor.name === "JWKSTimeout" ||
             verifyErr.constructor.name === "JWKSNoMatchingKey" ||
             verifyErr.constructor.name === "JWKSMultipleMatchingKeys");
 

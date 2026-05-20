@@ -53,6 +53,31 @@ export function loginWithGoogle(): void {
   window.location.href = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
 }
 
+export async function refreshAccessToken(): Promise<boolean> {
+  const data = getAuthData();
+  if (!data?.refreshToken) return false;
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+  const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ refresh_token: data.refreshToken }),
+    });
+    if (!res.ok) return false;
+    const json = await res.json() as { access_token?: string; refresh_token?: string };
+    if (!json.access_token) return false;
+    setAuthData({
+      accessToken: json.access_token,
+      refreshToken: json.refresh_token ?? data.refreshToken,
+      email: data.email,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function logout(): void {
   clearAuthData();
   window.location.replace('/login');

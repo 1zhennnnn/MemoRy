@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { prefetch } from '../../shared/noteCache';
+import Icon from '../common/Icon';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -57,6 +59,7 @@ export default function NoteCard({ note, onDelete, onRetry }: NoteCardProps) {
         alignItems: 'flex-start',
         cursor: 'pointer',
       }}
+      onMouseEnter={() => prefetch(note.id)}
       onClick={() => navigate(`/notes/${note.id}`)}
     >
       {/* Status indicator */}
@@ -64,7 +67,7 @@ export default function NoteCard({ note, onDelete, onRetry }: NoteCardProps) {
         {note.aiStatus === 'done' && <StarDone />}
         {note.aiStatus === 'pending' && <PixelCluster />}
         {note.aiStatus === 'failed' && (
-          <span style={{ fontSize: 13, color: 'var(--color-failed)' }}>✕</span>
+          <Icon name="close" size={13} color="var(--color-failed)" />
         )}
       </div>
 
@@ -109,13 +112,33 @@ export default function NoteCard({ note, onDelete, onRetry }: NoteCardProps) {
           </div>
         )}
 
+        {/* User note */}
+        {note.userNote && (
+          <div style={{
+            fontSize: 12,
+            color: 'var(--color-text-mid)',
+            background: 'var(--color-surf-2)',
+            borderLeft: '2px solid var(--color-signal-border)',
+            padding: '3px 8px',
+            borderRadius: '0 4px 4px 0',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {note.userNote}
+          </div>
+        )}
+
         {/* Meta */}
         <div style={{ fontSize: 11, color: 'var(--color-text-lo)', display: 'flex', gap: 8 }}>
           <span style={{ fontFamily: 'var(--font-mono)' }}>{domain(note.sourceUrl)}</span>
           <span>·</span>
           <span>{timeAgo}</span>
           <span>·</span>
-          <span>{note.noteType === 'image' ? '🖼 截圖' : '📄 文字'}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <Icon name={note.noteType === 'image' ? 'image' : 'note'} size={11} />
+            {note.noteType === 'image' ? '截圖' : note.noteType === 'page' ? '整頁' : '文字'}
+          </span>
         </div>
       </div>
 

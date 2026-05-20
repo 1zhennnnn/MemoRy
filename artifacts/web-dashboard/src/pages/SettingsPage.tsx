@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Icon from '../components/common/Icon';
 import { getUserEmail, logout } from '../shared/auth';
 import { api, healthz } from '../shared/api';
 import Spinner from '../components/common/Spinner';
@@ -53,7 +54,7 @@ export default function SettingsPage() {
                 fontSize: 16,
               }}
             >
-              🧠
+              <Icon name="cpu" size={18} />
             </div>
             <span style={{ fontSize: 13, color: 'var(--color-text-hi)' }}>{email}</span>
           </div>
@@ -86,8 +87,8 @@ export default function SettingsPage() {
             )}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn-ghost" onClick={() => handleExport('json')}>📄 JSON 格式</button>
-            <button className="btn-ghost" onClick={() => handleExport('markdown')}>📝 Markdown 格式</button>
+            <button className="btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => handleExport('json')}><Icon name="download" size={13} /> JSON</button>
+            <button className="btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => handleExport('markdown')}><Icon name="download" size={13} /> Markdown</button>
           </div>
         </div>
       </section>
@@ -115,7 +116,7 @@ export default function SettingsPage() {
             ) : healthOk ? (
               <span style={{ color: 'var(--color-done)' }}>✓ 正常</span>
             ) : (
-              <span style={{ color: 'var(--color-failed)' }}>✕ 連線失敗</span>
+              <span style={{ color: 'var(--color-failed)', display: 'flex', alignItems: 'center', gap: 4 }}><Icon name="close" size={12} /> 連線失敗</span>
             )}
           </div>
           <div style={{ color: 'var(--color-text-lo)', fontSize: 11 }}>

@@ -75,9 +75,9 @@ chrome.commands.onCommand.addListener((command) => {
         await saveTextNote({ sourceText: selectedText, sourceUrl: tab.url, sourceTitle: tab.title }, token);
         showToastInTab(tab.id, "✦ 已儲存選取文字");
       } else {
-        // 無選取 → 截圖代替
-        await saveScreenshot(tab.id, token);
-        showToastInTab(tab.id, "✦ 已截圖儲存");
+        // 無選取 → 書籤代替
+        await saveBookmark(tab, token);
+        showToastInTab(tab.id, "✦ 已加入書籤");
       }
     }
 

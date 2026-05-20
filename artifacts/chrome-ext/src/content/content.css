@@ -1,6 +1,7 @@
 #memory-capture-bar {
   all: initial;
-  position: absolute;
+  display: block;
+  position: fixed;
   z-index: 2147483647;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import Icon from '../components/common/Icon';
 import { format, parseISO } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { api } from '../shared/api';
+import { getCached, setCached } from '../shared/noteCache';
 import type { NoteDetail } from '../shared/types';
 import TagBadge from '../components/common/TagBadge';
 import AiStatusBadge from '../components/common/AiStatusBadge';
@@ -11,7 +13,9 @@ import Spinner from '../components/common/Spinner';
 
 export default function NotePage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [note, setNote] = useState<NoteDetail | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [sourceView, setSourceView] = useState<'iframe' | 'text' | null>(null);
@@ -19,9 +23,33 @@ export default function NotePage() {
   const [editingNote, setEditingNote] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editingTags, setEditingTags] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [editingSummary, setEditingSummary] = useState(false);
+  const [summaryDraft, setSummaryDraft] = useState('');
 
   useEffect(() => {
     if (!id) return;
+    // Use cached data immediately if available (from hover prefetch)
+    const cached = getCached(id);
+    if (cached) {
+      setNote(cached);
+      setUserNote(cached.userNote ?? '');
+      setTags(cached.tags ?? []);
+      setTitleDraft(cached.aiTitle ?? '');
+      setSummaryDraft(cached.aiSummary ?? '');
+      setSourceView(cached.noteType === 'page' && cached.sourceUrl ? 'iframe' : 'text');
+      setLoading(false);
+    } else {
+      setNote(null);
+      setLoading(true);
+    }
+    setExpanded(false);
+    setEditingTitle(false);
+    setEditingSummary(false);
     let cancelled = false;
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -29,8 +57,12 @@ export default function NotePage() {
       try {
         const n = await api.notes.get(id!);
         if (cancelled) return;
+        setCached(id!, n);
         setNote(n);
         setUserNote(n.userNote ?? '');
+        setTags(n.tags ?? []);
+        setTitleDraft(n.aiTitle ?? '');
+        setSummaryDraft(n.aiSummary ?? '');
         // default to iframe only for full-page captures with a sourceUrl
         setSourceView(n.noteType === 'page' && n.sourceUrl ? 'iframe' : 'text');
 
@@ -59,6 +91,42 @@ export default function NotePage() {
     };
   }, [id]);
 
+  async function saveTitle() {
+    if (!id || !note) return;
+    const title = titleDraft.trim() || (note.aiTitle ?? '');
+    setNote((prev) => prev ? { ...prev, aiTitle: title } : prev);
+    setEditingTitle(false);
+    try { await api.notes.patch(id, { aiTitle: title }); } catch {}
+  }
+
+  async function saveSummary() {
+    if (!id || !note) return;
+    const summary = summaryDraft.trim();
+    setNote((prev) => prev ? { ...prev, aiSummary: summary } : prev);
+    setEditingSummary(false);
+    try { await api.notes.patch(id, { aiSummary: summary }); } catch {}
+  }
+
+  async function saveTags(newTags: string[]) {
+    if (!id || !note) return;
+    setTags(newTags);
+    setNote((prev) => prev ? { ...prev, tags: newTags } : prev);
+    try { await api.notes.patch(id, { tags: newTags }); } catch {}
+  }
+
+  function addTag() {
+    const t = tagInput.trim().replace(/\s+/g, '_');
+    if (!t || tags.includes(t)) { setTagInput(''); return; }
+    void saveTags([...tags, t]);
+    setTagInput('');
+  }
+
+  async function deleteNote() {
+    if (!id) return;
+    await api.notes.delete(id);
+    navigate('/timeline');
+  }
+
   async function saveNote() {
     if (!id || !note) return;
     setSaving(true);
@@ -83,49 +151,143 @@ export default function NotePage() {
     return <div style={{ color: 'var(--color-text-lo)', padding: 32 }}>筆記不存在</div>;
   }
 
-  const allTags = note.tags.map((t) => ({ label: t, variant: 'ai' as const }));
-
   return (
     <div style={{ display: 'flex', gap: 24, maxWidth: 1100, margin: '0 auto' }}>
       {/* Main */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link to="/timeline" style={{ color: 'var(--color-text-lo)', textDecoration: 'none', fontSize: 13 }}>← 返回</Link>
-          <AiStatusBadge status={note.aiStatus} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Link to="/timeline" style={{ color: 'var(--color-text-lo)', textDecoration: 'none', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Icon name="chevronLeft" size={14} /> 返回
+            </Link>
+            <AiStatusBadge status={note.aiStatus} />
+          </div>
+          {confirmDelete ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-ghost" style={{ fontSize: 12, padding: '4px 12px', color: 'var(--color-failed)', borderColor: 'var(--color-failed)' }}
+                onClick={deleteNote}>
+                確認刪除
+              </button>
+              <button className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }}
+                onClick={() => setConfirmDelete(false)}>
+                取消
+              </button>
+            </div>
+          ) : (
+            <button className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px', color: 'var(--color-text-lo)' }}
+              onClick={() => setConfirmDelete(true)}>
+              <Icon name="trash" size={13} /> 刪除
+            </button>
+          )}
         </div>
 
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-hi)' }}>
-          {note.aiTitle ?? '無標題'}
-        </h1>
-
-        {/* Tags */}
-        {allTags.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {allTags.map((t, i) => <TagBadge key={i} label={t.label} variant={t.variant} />)}
+        {editingTitle ? (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              autoFocus
+              className="input-field"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void saveTitle(); if (e.key === 'Escape') setEditingTitle(false); }}
+              style={{ fontSize: 18, fontWeight: 700, flex: 1 }}
+            />
+            <button className="btn-primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={saveTitle}>儲存</button>
+            <button className="btn-ghost" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setEditingTitle(false)}>取消</button>
           </div>
+        ) : (
+          <h1
+            onClick={() => setEditingTitle(true)}
+            style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-hi)', cursor: 'text', borderRadius: 4, padding: '2px 4px', margin: '-2px -4px' }}
+            title="點擊編輯標題"
+          >
+            {note.aiTitle ?? '無標題'}
+          </h1>
         )}
 
+        {/* Tags */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {tags.map((t) => (
+            <span key={t} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              background: 'var(--color-signal-dim)', border: '1px solid var(--color-signal-border)',
+              borderRadius: 6, padding: '2px 8px', fontSize: 12, color: 'var(--color-signal-light)',
+            }}>
+              {t}
+              <button onClick={() => void saveTags(tags.filter((x) => x !== t))}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-lo)', fontSize: 11, padding: 0, lineHeight: 1 }}>
+                <Icon name="close" size={11} />
+              </button>
+            </span>
+          ))}
+
+          {editingTags ? (
+            <input
+              autoFocus
+              className="input-field"
+              placeholder="新增標籤…"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } if (e.key === 'Escape') setEditingTags(false); }}
+              style={{ width: 110, padding: '2px 8px', fontSize: 12, height: 26 }}
+            />
+          ) : (
+            <button className="btn-ghost" onClick={() => setEditingTags(true)}
+              style={{ fontSize: 11, padding: '2px 8px', height: 24 }}>
+              ＋ 標籤
+            </button>
+          )}
+          {editingTags && (
+            <button className="btn-ghost" onClick={() => { addTag(); setEditingTags(false); }}
+              style={{ fontSize: 11, padding: '2px 8px', height: 24 }}>
+              完成
+            </button>
+          )}
+        </div>
+
         {/* AI Summary */}
-        {note.aiSummary && (
-          <section>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: 8 }}>📄 AI 摘要</div>
+        <section>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="sparkle" size={12} /> 摘要
+            {!editingSummary && (
+              <button onClick={() => setEditingSummary(true)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-lo)', fontSize: 11, padding: '0 4px', marginLeft: 4 }}>
+                <Icon name="pencil" size={11} />
+              </button>
+            )}
+          </div>
+          {editingSummary ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <textarea
+                autoFocus
+                className="input-field"
+                value={summaryDraft}
+                onChange={(e) => setSummaryDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') setEditingSummary(false); }}
+                style={{ minHeight: 100, resize: 'vertical', fontSize: 13, lineHeight: 1.7 }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn-primary" style={{ padding: '6px 16px', fontSize: 12 }} onClick={saveSummary}>儲存</button>
+                <button className="btn-ghost" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => setEditingSummary(false)}>取消</button>
+              </div>
+            </div>
+          ) : (
             <div
+              onClick={() => setEditingSummary(true)}
               style={{
                 background: 'var(--color-surf-1)',
                 border: '1px solid var(--color-circuit-border)',
                 borderLeft: '3px solid var(--color-circuit)',
                 borderRadius: '0 var(--radius-card) var(--radius-card) 0',
-                padding: 16,
-                fontSize: 13,
-                color: 'var(--color-text-hi)',
-                lineHeight: 1.7,
+                padding: 16, fontSize: 13,
+                color: note.aiSummary ? 'var(--color-text-hi)' : 'var(--color-text-lo)',
+                lineHeight: 1.7, cursor: 'text',
               }}
             >
-              {note.aiSummary}
+              {note.aiSummary || '點擊新增摘要…'}
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* Source view */}
         {(note.sourceText || note.ocrText || note.sourceUrl) && (
@@ -144,13 +306,13 @@ export default function NotePage() {
                   {(sourceView === 'text' || iframeError) && (
                     <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 10px' }}
                       onClick={() => { setSourceView('iframe'); setIframeError(false); }}>
-                      🌐 網頁
+                      <Icon name="globe" size={12} /> 網頁
                     </button>
                   )}
                   {sourceView === 'iframe' && !iframeError && (
                     <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 10px' }}
                       onClick={() => setSourceView('text')}>
-                      📄 文字
+                      <Icon name="note" size={12} /> 文字
                     </button>
                   )}
                   <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer"
@@ -166,11 +328,7 @@ export default function NotePage() {
                 {/* iframe — inline, extends to fill viewport width minus sidebar */}
                 {note.sourceUrl && (sourceView === 'iframe') && !iframeError ? (
                   <div style={{
-                    // Break out of the main column rightward to fill full available width.
-                    // calc(100vw - 188px - 48px) = viewport - sidebar - main padding(24*2).
-                    // Shift left to align with the main content left edge.
-                    width: 'calc(100vw - 188px - 48px)',
-                    marginLeft: 'calc(50% - (100vw - 188px - 48px) / 2)',
+                    width: '100%',
                     borderRadius: 'var(--radius-card)',
                     overflow: 'hidden',
                     border: '1px solid var(--color-line-faint)',
@@ -197,7 +355,7 @@ export default function NotePage() {
                   >
                     {iframeError && (
                       <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--color-failed)' }}>
-                        ⚠ 此網站不允許嵌入顯示，改為顯示擷取的文字
+                        <Icon name="warning" size={12} style={{ display: 'inline', marginRight: 4 }} /> 此網站不允許嵌入顯示，改為顯示擷取的文字
                       </div>
                     )}
                     {note.sourceText ?? note.ocrText ?? '（無文字內容）'}
@@ -210,7 +368,7 @@ export default function NotePage() {
 
         {/* User note */}
         <section>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: 8 }}>💬 我的備注</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="pencil" size={12} /> 我的備注</div>
           {editingNote ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <textarea
@@ -267,23 +425,21 @@ export default function NotePage() {
         >
           <div style={{ fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: 4 }}>來源資訊</div>
           {note.sourceUrl && (
-            <div style={{ color: 'var(--color-text-mid)' }}>
-              🔗{' '}
-              <a
-                href={note.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: 'var(--color-signal-light)', textDecoration: 'none', fontFamily: 'var(--font-mono)' }}
-              >
+            <div style={{ color: 'var(--color-text-mid)', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+              <Icon name="link" size={12} style={{ marginTop: 1, flexShrink: 0 }} />
+              <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer"
+                style={{ color: 'var(--color-signal-light)', textDecoration: 'none', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
                 {note.sourceUrl.length > 40 ? note.sourceUrl.slice(0, 40) + '...' : note.sourceUrl}
               </a>
             </div>
           )}
-          <div style={{ color: 'var(--color-text-lo)' }}>
-            📅 {note.createdAt ? format(parseISO(note.createdAt), 'yyyy-MM-dd HH:mm', { locale: zhTW }) : '—'}
+          <div style={{ color: 'var(--color-text-lo)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="calendar" size={12} />
+            {note.createdAt ? format(parseISO(note.createdAt), 'yyyy-MM-dd HH:mm', { locale: zhTW }) : '—'}
           </div>
-          <div style={{ color: 'var(--color-text-lo)' }}>
-            📦 {note.noteType === 'image' ? '截圖' : '文字'}類型
+          <div style={{ color: 'var(--color-text-lo)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name={note.noteType === 'image' ? 'image' : 'note'} size={12} />
+            {note.noteType === 'image' ? '截圖' : note.noteType === 'page' ? '整頁擷取' : '文字'}
           </div>
         </div>
 

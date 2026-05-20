@@ -11,6 +11,7 @@ import ReportDetailPage from './pages/ReportDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import BookmarksPage from './pages/BookmarksPage';
 import ChatPage from './pages/ChatPage';
+import GraphPage from './pages/GraphPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!getAccessToken()) return <Navigate to="/login" replace />;
@@ -30,7 +31,8 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/timeline" replace />} />
+          <Route index element={<Navigate to="/graph" replace />} />
+          <Route path="graph" element={<GraphPage />} />
           <Route path="new" element={<NewNotePage />} />
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="notes/:id" element={<NotePage />} />

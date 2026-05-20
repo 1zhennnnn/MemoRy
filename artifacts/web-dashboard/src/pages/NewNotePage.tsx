@@ -1,7 +1,9 @@
 import { useState, useRef, type DragEvent, type ChangeEvent } from 'react';
+import Icon from '../components/common/Icon';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../shared/api';
 import Spinner from '../components/common/Spinner';
+import { graphData } from '../shared/pageCache';
 
 type Tab = 'text' | 'image' | 'batch';
 
@@ -64,6 +66,7 @@ export default function NewNotePage() {
     setLoading(true); setError('');
     try {
       await api.notes.createText({ sourceText, sourceUrl: sourceUrl || undefined, userNote: userNote || undefined });
+      graphData.invalidate();
       navigate('/timeline');
     } catch (err) {
       setError(err instanceof Error ? err.message : '建立失敗');
@@ -82,6 +85,7 @@ export default function NewNotePage() {
         await api.notes.createText({ sourceText: text });
         setBatchProgress((p) => p ? { ...p, done: p.done + 1 } : null);
       }));
+      graphData.invalidate();
       navigate('/timeline');
     } catch (err) {
       setError(err instanceof Error ? err.message : '部分筆記建立失敗');
@@ -97,6 +101,7 @@ export default function NewNotePage() {
     try {
       const base64 = await fileToBase64(imageFile);
       await api.notes.createImage({ imageBase64: base64, sourceUrl: imgSourceUrl || undefined, sourceTitle: imageFile.name });
+      graphData.invalidate();
       navigate('/timeline');
     } catch (err) {
       setError(err instanceof Error ? err.message : '上傳失敗');
@@ -121,7 +126,7 @@ export default function NewNotePage() {
   return (
     <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
       <h1 style={{ fontSize: 'var(--font-xl)', fontWeight: 700, color: 'var(--color-text-hi)' }}>
-        ✏ 新增筆記
+        <Icon name="pencil" size={18} style={{ display: 'inline', marginRight: 8 }} /> 新增筆記
       </h1>
 
       {/* Tab selector */}
@@ -133,13 +138,13 @@ export default function NewNotePage() {
         gap: 4,
       }}>
         <button style={tabStyle(tab === 'text')} onClick={() => { setTab('text'); setError(''); }}>
-          ✏ 輸入文字
+          <Icon name="pencil" size={13} style={{ display: 'inline', marginRight: 4 }} /> 輸入文字
         </button>
         <button style={tabStyle(tab === 'image')} onClick={() => { setTab('image'); setError(''); }}>
-          🖼 上傳圖片
+          <Icon name="image" size={13} style={{ display: 'inline', marginRight: 4 }} /> 上傳圖片
         </button>
         <button style={tabStyle(tab === 'batch')} onClick={() => { setTab('batch'); setError(''); }}>
-          📋 批次輸入
+          <Icon name="clipboard" size={13} style={{ display: 'inline', marginRight: 4 }} /> 批次輸入
         </button>
       </div>
 
@@ -193,7 +198,7 @@ export default function NewNotePage() {
 
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmitText} disabled={loading}>
-              {loading ? <Spinner size={16} color="#fff" /> : '✦ 送出並讓 AI 處理'}
+              {loading ? <Spinner size={16} color="#fff" /> : <><Icon name="sparkle" size={13} /> 送出並讓 AI 處理</>}
             </button>
             <button className="btn-ghost" onClick={() => navigate(-1)} disabled={loading}>取消</button>
           </div>
@@ -228,7 +233,7 @@ export default function NewNotePage() {
                   style={{ padding: '6px 10px', marginTop: 4, flexShrink: 0 }}
                   onClick={() => setBatchEntries(batchEntries.filter((_, j) => j !== i))}
                 >
-                  ✕
+                  <Icon name="close" size={11} />
                 </button>
               )}
             </div>
@@ -252,7 +257,7 @@ export default function NewNotePage() {
 
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmitBatch} disabled={loading}>
-              {loading ? <Spinner size={16} color="#fff" /> : `✦ 送出 ${batchEntries.filter(t => t.trim()).length} 篇`}
+              {loading ? <Spinner size={16} color="#fff" /> : <><Icon name="sparkle" size={13} /> {`送出 ${batchEntries.filter(t => t.trim()).length} 篇`}</>}
             </button>
             <button className="btn-ghost" onClick={() => navigate(-1)} disabled={loading}>取消</button>
           </div>
@@ -271,7 +276,7 @@ export default function NewNotePage() {
               onDrop={onDrop}
               onClick={() => fileInputRef.current?.click()}
             >
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🖼</div>
+              <div style={{ marginBottom: 12, color: 'var(--color-text-lo)', opacity: 0.5 }}><Icon name="image" size={40} /></div>
               <div style={{ fontSize: 'var(--font-md)', fontWeight: 600, marginBottom: 6 }}>
                 拖放圖片到這裡
               </div>
@@ -309,7 +314,7 @@ export default function NewNotePage() {
                 }}
                 onClick={() => { setImageFile(null); setImagePreview(null); }}
               >
-                ✕ 重選
+                <Icon name="close" size={12} style={{ display: 'inline', marginRight: 4 }} /> 重選
               </button>
               <div style={{
                 padding: '8px 14px',
@@ -344,14 +349,14 @@ export default function NewNotePage() {
             fontSize: 'var(--font-sm)',
             color: 'var(--color-circuit-light)',
           }}>
-            💡 上傳後 AI 會自動 OCR 提取圖片中的文字，再生成摘要和標籤
+            <Icon name="lightbulb" size={12} style={{ display: 'inline', marginRight: 4 }} /> 上傳後 AI 會自動 OCR 提取圖片中的文字，再生成摘要和標籤
           </div>
 
           {error && <div style={{ color: 'var(--color-failed)', fontSize: 'var(--font-sm)' }}>{error}</div>}
 
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmitImage} disabled={loading || !imageFile}>
-              {loading ? <Spinner size={16} color="#fff" /> : '✦ 上傳並讓 AI 處理'}
+              {loading ? <Spinner size={16} color="#fff" /> : <><Icon name="sparkle" size={13} /> 上傳並讓 AI 處理</>}
             </button>
             <button className="btn-ghost" onClick={() => navigate(-1)} disabled={loading}>取消</button>
           </div>
