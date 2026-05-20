@@ -12,8 +12,7 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
   const [notes, setNotes]     = useState<NoteCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery]     = useState("");
-  const [screenshotState, setScreenshotState] = useState<ActionState>("idle");
-  const [pageTextState, setPageTextState]     = useState<ActionState>("idle");
+  const [pageTextState, setPageTextState] = useState<ActionState>("idle");
   const [lastError, setLastError]             = useState<string | null>(null);
 
   useEffect(() => {
@@ -191,11 +190,6 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
             () => runAction("SAVE_PAGE_TEXT", setPageTextState),
             "✦ 已擷取",
           )}
-          {actionBtn(
-            "🔗 快速書籤", screenshotState,
-            () => runAction("SAVE_SCREENSHOT", setScreenshotState),
-            "✦ 已書籤",
-          )}
           <button
             onClick={() => void loadNotes()}
             style={{
@@ -207,7 +201,7 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
           </button>
         </div>
         <div style={{ fontSize: "10px", color: colors.textLo, textAlign: "center" }}>
-          Alt+Shift+S 選取 ・ Alt+Shift+P 書籤 ・ Alt+Shift+A 整頁
+          Alt+Shift+S 選取 ・ Alt+Shift+A 整頁
         </div>
         {lastError && (
           <div style={{
