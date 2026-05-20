@@ -66,10 +66,6 @@
       "suggested_key": { "default": "Alt+Shift+S" },
       "description": "儲存選取文字至 MemoRy"
     },
-    "save-screenshot": {
-      "suggested_key": { "default": "Alt+Shift+P" },
-      "description": "截圖儲存至 MemoRy"
-    },
     "save-page": {
       "suggested_key": { "default": "Alt+Shift+A" },
       "description": "擷取整頁文字至 MemoRy"

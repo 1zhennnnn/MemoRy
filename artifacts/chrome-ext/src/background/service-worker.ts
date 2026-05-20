@@ -23,11 +23,6 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "📄 擷取整頁文字至 MemoRy",
     contexts: ["page"],
   });
-  chrome.contextMenus.create({
-    id: "memory-save-screenshot",
-    title: "🔗 書籤儲存至 MemoRy",
-    contexts: ["page"],
-  });
 });
 
 // ── Token 定時刷新 ────────────────────────────────────────────────
@@ -48,10 +43,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === "memory-save-page" && tab?.id) {
       await savePageText(tab.id, token);
       showToastInTab(tab.id, "✦ 已擷取整頁文字");
-    }
-    if (info.menuItemId === "memory-save-screenshot" && tab) {
-      await saveBookmark(tab, token);
-      if (tab.id) showToastInTab(tab.id, "✦ 已加入書籤");
     }
   })();
 });
@@ -74,16 +65,7 @@ chrome.commands.onCommand.addListener((command) => {
       if (selectedText) {
         await saveTextNote({ sourceText: selectedText, sourceUrl: tab.url, sourceTitle: tab.title }, token);
         showToastInTab(tab.id, "✦ 已儲存選取文字");
-      } else {
-        // 無選取 → 書籤代替
-        await saveBookmark(tab, token);
-        showToastInTab(tab.id, "✦ 已加入書籤");
       }
-    }
-
-    if (command === "save-screenshot") {
-      await saveBookmark(tab, token);
-      showToastInTab(tab.id, "✦ 已加入書籤");
     }
 
     if (command === "save-page") {
@@ -115,14 +97,6 @@ async function handleMessage(message: Message): Promise<unknown> {
       const token = await getToken();
       if (!token) throw new Error("未登入");
       return saveTextNote(message.payload as SaveTextPayload, token);
-    }
-
-    case "SAVE_SCREENSHOT": {
-      const token = await getToken();
-      if (!token) throw new Error("未登入");
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) throw new Error("找不到目前分頁");
-      return saveBookmark(tab, token);
     }
 
     case "SAVE_PAGE_TEXT": {
@@ -183,13 +157,6 @@ async function savePageText(tabId: number, token: string): Promise<unknown> {
     sourceUrl:   tab.url,
     sourceTitle: tab.title,
     noteType:    'page',
-  }, token);
-}
-
-async function saveBookmark(tab: chrome.tabs.Tab, token: string): Promise<unknown> {
-  return apiPost("/api/notes/bookmark", {
-    sourceUrl:   tab.url,
-    sourceTitle: tab.title,
   }, token);
 }
 

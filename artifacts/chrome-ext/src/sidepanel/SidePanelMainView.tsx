@@ -191,6 +191,16 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
             "✦ 已擷取",
           )}
           <button
+            onClick={() => { void openDashboard("/chat"); }}
+            style={{
+              flex: 1, padding: "9px 8px", fontSize: "12px", cursor: "pointer",
+              borderRadius: "7px", border: `1px solid ${colors.borderSub}`,
+              background: colors.surf2, color: colors.textHi,
+            }}
+          >
+            ✦ AI 助手
+          </button>
+          <button
             onClick={() => void loadNotes()}
             style={{
               padding: "9px 12px", background: colors.surf2, border: `1px solid ${colors.borderSub}`,
