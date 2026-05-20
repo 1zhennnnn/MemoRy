@@ -259,7 +259,8 @@ export default function GraphPage() {
   const mouseRef   = useRef<{ x: number; y: number } | null>(null);
   const hovRef     = useRef<SimNode | null>(null);
   const tRef       = useRef<Transform>({ s: 1, x: 0, y: 0 });
-  const dragRef    = useRef<{ sx: number; sy: number; tx: number; ty: number; moved: boolean } | null>(null);
+  const dragRef     = useRef<{ sx: number; sy: number; tx: number; ty: number; moved: boolean } | null>(null);
+  const nodeDragRef = useRef<{ nodeId: string; moved: boolean; startX: number; startY: number } | null>(null);
 
   const filterIdsRef      = useRef<Set<string>>(new Set());
   const starsRef          = useRef<Star[]>([]);
@@ -359,6 +360,19 @@ export default function GraphPage() {
         sim.alpha *= ALPHA_DECAY;
       }
 
+      // Pin dragged node to mouse (after tick so forces don't override)
+      const nd = nodeDragRef.current;
+      if (nd && sim && mouseRef.current) {
+        const tt = tRef.current;
+        const n = sim.map[nd.nodeId];
+        if (n) {
+          n.x = (mouseRef.current.x - tt.x) / tt.s;
+          n.y = (mouseRef.current.y - tt.y) / tt.s;
+          n.vx = 0; n.vy = 0;
+          sim.alpha = Math.max(sim.alpha, 0.35); // keep graph alive while dragging
+        }
+      }
+
       if (sim) {
         const m = mouseRef.current;
         const t = tRef.current;
@@ -418,20 +432,28 @@ export default function GraphPage() {
     const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
     const t = tRef.current;
     const wx = (sx - t.x) / t.s, wy = (sy - t.y) / t.s;
-    // Only start pan if not on a node
     const sim = simRef.current;
     if (sim) {
       for (const n of sim.nodes) {
-        if ((wx - n.x) ** 2 + (wy - n.y) ** 2 < (n.r * 2.5) ** 2) return;
+        if ((wx - n.x) ** 2 + (wy - n.y) ** 2 < (n.r * 2.5) ** 2) {
+          // Start node drag — record start position for moved detection
+          nodeDragRef.current = { nodeId: n.id, moved: false, startX: sx, startY: sy };
+          return;
+        }
       }
     }
+    // Start pan drag
     dragRef.current = { sx, sy, tx: t.x, ty: t.y, moved: false };
   }
   function onMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
     mouseRef.current = { x: sx, y: sy };
-    if (dragRef.current) {
+    if (nodeDragRef.current) {
+      // Compare against mousedown start position (not previous move event)
+      const dx = sx - nodeDragRef.current.startX, dy = sy - nodeDragRef.current.startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) nodeDragRef.current.moved = true;
+    } else if (dragRef.current) {
       const dx = sx - dragRef.current.sx, dy = sy - dragRef.current.sy;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragRef.current.moved = true;
       if (dragRef.current.moved) {
@@ -440,10 +462,21 @@ export default function GraphPage() {
     }
   }
   function onMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
+    // Node drag end
+    const nd = nodeDragRef.current;
+    if (nd) {
+      nodeDragRef.current = null;
+      if (!nd.moved) {
+        // Was a click, not a drag — navigate
+        navigate(`/notes/${nd.nodeId}`);
+      }
+      return;
+    }
+    // Pan drag end
     const d = dragRef.current;
     dragRef.current = null;
-    if (d?.moved) return; // was a pan, not a click
-    // Check node click
+    if (d?.moved) return;
+    // Tap on empty canvas — check node hit one more time
     const sim = simRef.current;
     if (!sim) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -452,12 +485,14 @@ export default function GraphPage() {
     const wx = (sx - t.x) / t.s, wy = (sy - t.y) / t.s;
     for (const n of sim.nodes) {
       if ((wx - n.x) ** 2 + (wy - n.y) ** 2 < (n.r * 2.5) ** 2) {
-        navigate(`/notes/${n.id}`);
-        return;
+        navigate(`/notes/${n.id}`); return;
       }
     }
   }
-  function onMouseLeave() { mouseRef.current = null; hovRef.current = null; setHover(null); dragRef.current = null; }
+  function onMouseLeave() {
+    mouseRef.current = null; hovRef.current = null; setHover(null);
+    dragRef.current = null; nodeDragRef.current = null;
+  }
 
   // ── Search ────────────────────────────────────────────────────────────────
 
@@ -554,7 +589,8 @@ export default function GraphPage() {
 
       <canvas
         ref={canvasRef}
-        style={{ width: '100%', height: '100%', display: 'block', cursor: dragRef.current?.moved ? 'grabbing' : hover ? 'pointer' : 'grab' }}
+        style={{ width: '100%', height: '100%', display: 'block',
+          cursor: (nodeDragRef.current?.moved || dragRef.current?.moved) ? 'grabbing' : hover ? 'grab' : 'default' }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
