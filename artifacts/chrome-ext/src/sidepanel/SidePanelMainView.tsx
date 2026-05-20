@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import type { NoteCard, Message } from "../shared/types.js";
 import NoteRow from "../popup/components/NoteRow.js";
+import { useExtTheme, DASHBOARD_URL } from "../shared/theme.js";
 
 interface Props { onLogout: () => void; onNeedRelogin: () => void; }
 
 type ActionState = "idle" | "saving" | "done" | "error";
 
 export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
+  const { colors, theme, toggle } = useExtTheme();
   const [notes, setNotes]     = useState<NoteCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery]     = useState("");
@@ -40,7 +42,6 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
       setTimeout(() => { setState("idle"); void loadNotes(); }, 1800);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // token 遺失或過期 → 直接跳回登入頁讓使用者重新登入
       if (msg.includes("未登入") || msg.includes("401")) {
         onNeedRelogin();
         return;
@@ -49,6 +50,18 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
       setState("error");
       setTimeout(() => setState("idle"), 3000);
     }
+  }
+
+  async function openDashboard(path = "") {
+    const stored = await chrome.storage.local.get(["memory_auth_token", "memory_refresh_token"]);
+    const accessToken  = stored["memory_auth_token"]  as string | undefined;
+    const refreshToken = stored["memory_refresh_token"] as string | undefined;
+    let hash = "";
+    if (accessToken) {
+      hash = `#ext_token=${encodeURIComponent(accessToken)}`;
+      if (refreshToken) hash += `&ext_refresh=${encodeURIComponent(refreshToken)}`;
+    }
+    void chrome.tabs.create({ url: `${DASHBOARD_URL}${path}${hash}` });
   }
 
   async function handleLogout() {
@@ -74,10 +87,10 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
         flex: 1, padding: "9px 8px", fontSize: "12px", cursor: "pointer",
         borderRadius: "7px", border: "1px solid",
         ...(state === "done"
-          ? { background: "#1A3A2A", borderColor: "#34D4A8", color: "#34D4A8" }
+          ? { background: theme === "dark" ? "#1A3A2A" : "#E6F7F3", borderColor: colors.done, color: colors.done }
           : state === "error"
-          ? { background: "#2A1020", borderColor: "#F05068", color: "#F05068" }
-          : { background: "#161A28", borderColor: "#2A3555", color: "#DFE4F0" }),
+          ? { background: theme === "dark" ? "#2A1020" : "#FDEDEF", borderColor: colors.failed, color: colors.failed }
+          : { background: colors.surf2, borderColor: colors.borderSub, color: colors.textHi }),
       }}
     >
       {state === "saving" ? "處理中…" : state === "done" ? doneLabel : state === "error" ? "失敗，重試" : label}
@@ -85,28 +98,39 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: colors.bg }}>
       {/* Header */}
       <div style={{
-        padding: "12px 16px", borderBottom: "1px solid #1A2035",
+        padding: "12px 16px", borderBottom: `1px solid ${colors.border}`,
         display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
+        background: colors.surf1,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <img src="icons/icon48.png" alt="" style={{ width: 80, height: 44, objectFit: "contain" }} />
-          <span style={{ fontWeight: 700, fontSize: "15px", color: "#DFE4F0" }}>MemoRy</span>
+          <span style={{ fontWeight: 700, fontSize: "15px", color: colors.textHi }}>MemoRy</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <a
-            href="http://localhost:3000"
-            target="_blank"
-            rel="noreferrer"
-            style={{ color: "#5B7AE0", fontSize: "11px", textDecoration: "none" }}
+          {/* Theme toggle */}
+          <button
+            onClick={toggle}
+            title={theme === "dark" ? "切換亮色模式" : "切換暗色模式"}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: "15px", lineHeight: 1, padding: "2px 4px",
+              color: colors.textMid,
+            }}
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+          <button
+            onClick={() => { void openDashboard(); }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: colors.signal, fontSize: "11px", padding: 0 }}
           >
             開啟 Dashboard ↗
-          </a>
+          </button>
           <button
             onClick={handleLogout}
-            style={{ background: "none", border: "none", color: "#4A5272", cursor: "pointer", fontSize: "11px" }}
+            style={{ background: "none", border: "none", color: colors.textLo, cursor: "pointer", fontSize: "11px" }}
           >
             登出
           </button>
@@ -114,7 +138,7 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
       </div>
 
       {/* Search */}
-      <div style={{ padding: "10px 16px", borderBottom: "1px solid #1A2035", flexShrink: 0 }}>
+      <div style={{ padding: "10px 16px", borderBottom: `1px solid ${colors.border}`, flexShrink: 0, background: colors.surf1 }}>
         <input
           type="text"
           placeholder="搜尋筆記…"
@@ -122,18 +146,19 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
           onChange={(e) => setQuery(e.target.value)}
           style={{
             width: "100%", padding: "7px 12px",
-            background: "#161A28", border: "1px solid #2A3555",
-            borderRadius: "6px", color: "#DFE4F0", fontSize: "12px", outline: "none",
+            background: colors.inputBg, border: `1px solid ${colors.borderSub}`,
+            borderRadius: "6px", color: colors.textHi, fontSize: "12px", outline: "none",
+            boxSizing: "border-box",
           }}
         />
       </div>
 
       {/* Recent Notes */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, overflowY: "auto", background: colors.bg }}>
         {loading ? (
-          <div style={{ padding: "24px", textAlign: "center", color: "#4A5272", fontSize: "12px" }}>載入中…</div>
+          <div style={{ padding: "24px", textAlign: "center", color: colors.textLo, fontSize: "12px" }}>載入中…</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: "24px", textAlign: "center", color: "#4A5272", fontSize: "12px" }}>
+          <div style={{ padding: "24px", textAlign: "center", color: colors.textLo, fontSize: "12px" }}>
             {query ? "無符合筆記" : "還沒有筆記，試試下方按鈕儲存當前頁面"}
           </div>
         ) : (
@@ -143,8 +168,9 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
 
       {/* Action Bar */}
       <div style={{
-        padding: "10px 16px", borderTop: "1px solid #1A2035",
+        padding: "10px 16px", borderTop: `1px solid ${colors.border}`,
         display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0,
+        background: colors.surf1,
       }}>
         <div style={{ display: "flex", gap: "8px" }}>
           {actionBtn(
@@ -160,30 +186,25 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
           <button
             onClick={() => void loadNotes()}
             style={{
-              padding: "9px 12px", background: "#161A28", border: "1px solid #2A3555",
-              borderRadius: "7px", color: "#8A96B2", fontSize: "12px", cursor: "pointer", flexShrink: 0,
+              padding: "9px 12px", background: colors.surf2, border: `1px solid ${colors.borderSub}`,
+              borderRadius: "7px", color: colors.textMid, fontSize: "12px", cursor: "pointer", flexShrink: 0,
             }}
           >
             ↻
           </button>
         </div>
-        <div style={{ fontSize: "10px", color: "#4A5272", textAlign: "center" }}>
+        <div style={{ fontSize: "10px", color: colors.textLo, textAlign: "center" }}>
           Alt+Shift+S 選取 ・ Alt+Shift+P 書籤 ・ Alt+Shift+A 整頁
         </div>
         {lastError && (
           <div style={{
-            fontSize: "11px", color: "#F05068",
-            background: "rgba(240,80,104,0.08)", border: "1px solid rgba(240,80,104,0.3)",
+            fontSize: "11px", color: colors.failed,
+            background: theme === "dark" ? "rgba(240,80,104,0.08)" : "rgba(208,48,80,0.08)",
+            border: `1px solid ${colors.failed}4D`,
             borderRadius: "6px", padding: "6px 10px",
             wordBreak: "break-all",
           }}>
             ⚠ {lastError}
-            {lastError.includes("fetch") && (
-              <div style={{ marginTop: 4, color: "#8A96B2" }}>
-                請確認 API Server 已啟動：<br />
-                <code style={{ color: "#F0A030" }}>pnpm --filter @workspace/api-server run dev</code>
-              </div>
-            )}
           </div>
         )}
       </div>
