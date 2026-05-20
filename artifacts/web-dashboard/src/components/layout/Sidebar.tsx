@@ -11,17 +11,13 @@ const PREFETCH: Record<string, () => void> = {
 };
 
 const NAV_ITEMS = [
-  { to: '/graph',    label: '知識星座圖', icon: 'graph'    },
   { to: '/timeline', label: '時間軸',     icon: 'calendar' },
+  { to: '/graph',    label: '知識星座圖', icon: 'graph'    },
   { to: '/reports',  label: '日報',       icon: 'report'   },
+  { to: '/chat',     label: 'AI 助手',    icon: 'sparkle'  },
 ] as const;
 
-interface SidebarProps {
-  chatOpen: boolean;
-  onChatToggle: () => void;
-}
-
-export default function Sidebar({ chatOpen, onChatToggle }: SidebarProps) {
+export default function Sidebar() {
   const email = getUserEmail() ?? '';
 
   return (
@@ -38,7 +34,7 @@ export default function Sidebar({ chatOpen, onChatToggle }: SidebarProps) {
         gap: 4,
       }}
     >
-      <Link to="/graph" style={{ display: 'block', padding: '8px 12px 16px' }}>
+      <Link to="/timeline" style={{ display: 'block', padding: '8px 12px 16px' }}>
         <img src="/logo.png" alt="MemoRy" style={{ width: 140, height: 77, objectFit: 'contain' }} />
       </Link>
 
@@ -63,16 +59,6 @@ export default function Sidebar({ chatOpen, onChatToggle }: SidebarProps) {
             <span>{label}</span>
           </NavLink>
         ))}
-
-        {/* AI 助手：在側欄開啟抽屜 */}
-        <button
-          onClick={onChatToggle}
-          className={`nav-item${chatOpen ? ' active' : ''}`}
-          style={{ width: '100%', background: 'none', border: chatOpen ? undefined : 'none', cursor: 'pointer', textAlign: 'left' }}
-        >
-          <Icon name="sparkle" size={14} />
-          <span>AI 助手</span>
-        </button>
       </nav>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
