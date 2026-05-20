@@ -283,9 +283,15 @@ router.get("/notes/:id", requireAuth, async (req, res, next) => {
       throw new AppError("Note not found", ERROR_CODES.NOT_FOUND, 404);
     }
 
+    // Fetch highlights separately via raw SQL (jsonb, not in Drizzle schema)
+    const hlRows = await db.execute<{ highlights: unknown }>(
+      sql`SELECT highlights FROM notes WHERE id = ${id} AND user_id = ${userId} LIMIT 1`,
+    );
+    const highlights = (hlRows as unknown as Array<{ highlights: unknown }>)[0]?.highlights ?? [];
+
     const relatedNotes = await findRelatedNotes(id, userId);
 
-    res.json({ ...note, relatedNotes });
+    res.json({ ...note, highlights, relatedNotes });
   } catch (err) {
     next(err);
   }
@@ -295,11 +301,12 @@ router.patch("/notes/:id", requireAuth, async (req, res, next) => {
   try {
     const userId = req.user!.id;
     const id = String(req.params["id"]);
-    const { aiTitle, aiSummary, userNote, tags } = req.body as {
+    const { aiTitle, aiSummary, userNote, tags, highlights } = req.body as {
       aiTitle?: string;
       aiSummary?: string;
       userNote?: string;
       tags?: string[];
+      highlights?: Array<{ start: number; end: number; color: string }>;
     };
 
     const [existing] = await db
@@ -322,6 +329,13 @@ router.patch("/notes/:id", requireAuth, async (req, res, next) => {
     }
 
     await db.update(notesTable).set(updates).where(and(eq(notesTable.id, id), eq(notesTable.userId, userId)));
+
+    // JSONB columns need explicit cast to avoid driver serialisation issues
+    if (highlights !== undefined) {
+      await db.execute(
+        sql`UPDATE notes SET highlights = ${JSON.stringify(highlights)}::jsonb WHERE id = ${id} AND user_id = ${userId}`,
+      );
+    }
 
     const reembedding = !!(aiTitle !== undefined || aiSummary !== undefined);
     if (reembedding && existing.sourceText) {

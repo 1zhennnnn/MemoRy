@@ -1,15 +1,163 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import Icon from '../components/common/Icon';
 import { format, parseISO } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { api } from '../shared/api';
 import { getCached, setCached } from '../shared/noteCache';
-import type { NoteDetail } from '../shared/types';
+import type { NoteDetail, Highlight } from '../shared/types';
 import TagBadge from '../components/common/TagBadge';
 import AiStatusBadge from '../components/common/AiStatusBadge';
 import NoteCard from '../components/notes/NoteCard';
 import Spinner from '../components/common/Spinner';
+
+// ── Highlight helpers ─────────────────────────────────────────────────────────
+
+const HL_COLORS = [
+  { value: 'rgba(255,214,0,0.42)',  dot: '#ffd600', label: '黃' },
+  { value: 'rgba(0,200,100,0.38)',  dot: '#00c864', label: '綠' },
+  { value: 'rgba(50,160,255,0.38)', dot: '#32a0ff', label: '藍' },
+  { value: 'rgba(255,80,150,0.38)', dot: '#ff5096', label: '粉' },
+];
+
+function getAbsoluteOffset(container: Element, node: Node, offset: number): number {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let pos = 0, cur = walker.nextNode();
+  while (cur) {
+    if (cur === node) return pos + offset;
+    pos += cur.textContent?.length ?? 0;
+    cur = walker.nextNode();
+  }
+  return pos + offset;
+}
+
+function buildSegments(text: string, highlights: Highlight[]) {
+  if (!highlights.length) return [{ text, color: null as string | null }];
+  const sorted = [...highlights].sort((a, b) => a.start - b.start);
+  const segs: Array<{ text: string; color: string | null }> = [];
+  let pos = 0;
+  for (const h of sorted) {
+    const start = Math.max(h.start, pos);
+    if (start >= h.end) continue;
+    if (start > pos) segs.push({ text: text.slice(pos, start), color: null });
+    segs.push({ text: text.slice(start, h.end), color: h.color });
+    pos = h.end;
+  }
+  if (pos < text.length) segs.push({ text: text.slice(pos), color: null });
+  return segs;
+}
+
+// ── HighlightedText ───────────────────────────────────────────────────────────
+
+interface ToolbarState { start: number; end: number; x: number; y: number; hasOverlap: boolean; overlapIdx: number[]; }
+
+function HighlightedText({
+  text, highlights, onChange,
+}: { text: string; highlights: Highlight[]; onChange: (h: Highlight[]) => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [toolbar, setToolbar] = useState<ToolbarState | null>(null);
+
+  const handleMouseUp = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !containerRef.current) { setToolbar(null); return; }
+    const range = sel.getRangeAt(0);
+    if (!containerRef.current.contains(range.commonAncestorContainer)) { setToolbar(null); return; }
+    const start = getAbsoluteOffset(containerRef.current, range.startContainer, range.startOffset);
+    const end   = getAbsoluteOffset(containerRef.current, range.endContainer,   range.endOffset);
+    if (start >= end) { setToolbar(null); return; }
+    const overlapIdx = highlights
+      .map((h, i) => ({ h, i }))
+      .filter(({ h }) => h.start < end && h.end > start)
+      .map(({ i }) => i);
+    const rect = range.getBoundingClientRect();
+    setToolbar({ start, end, x: rect.left + rect.width / 2, y: rect.top - 6, hasOverlap: overlapIdx.length > 0, overlapIdx });
+  }, [highlights]);
+
+  function addHighlight(color: string) {
+    if (!toolbar) return;
+    const next = [...highlights, { start: toolbar.start, end: toolbar.end, color }];
+    onChange(next);
+    setToolbar(null);
+    window.getSelection()?.removeAllRanges();
+  }
+
+  function removeOverlap() {
+    if (!toolbar) return;
+    onChange(highlights.filter((_, i) => !toolbar.overlapIdx.includes(i)));
+    setToolbar(null);
+    window.getSelection()?.removeAllRanges();
+  }
+
+  useEffect(() => {
+    const hide = () => setToolbar(null);
+    document.addEventListener('keydown', hide);
+    return () => document.removeEventListener('keydown', hide);
+  }, []);
+
+  const segs = buildSegments(text, highlights);
+
+  return (
+    <>
+      <div
+        ref={containerRef}
+        onMouseUp={handleMouseUp}
+        style={{
+          background: 'var(--color-surf-1)',
+          border: '1px solid var(--color-line-faint)',
+          borderRadius: 'var(--radius-card)',
+          padding: 16, fontSize: 12,
+          color: 'var(--color-text-mid)',
+          lineHeight: 1.7, whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word', maxHeight: 400, overflowY: 'auto',
+          userSelect: 'text', cursor: 'text',
+        }}
+      >
+        {segs.map((s, i) =>
+          s.color
+            ? <mark key={i} style={{ background: s.color, color: 'inherit', borderRadius: 2, padding: '0 1px' }}>{s.text}</mark>
+            : <span key={i}>{s.text}</span>
+        )}
+      </div>
+
+      {/* Floating toolbar */}
+      {toolbar && (
+        <div
+          style={{
+            position: 'fixed',
+            left: toolbar.x, top: toolbar.y,
+            transform: 'translate(-50%, -100%)',
+            background: 'var(--color-surf-2)',
+            border: '1px solid var(--color-line-faint)',
+            borderRadius: 8, padding: '5px 8px',
+            display: 'flex', gap: 5, alignItems: 'center',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.45)',
+            zIndex: 1000,
+          }}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {toolbar.hasOverlap ? (
+            <button onClick={removeOverlap} style={{
+              background: 'none', border: '1px solid var(--color-line-faint)',
+              borderRadius: 5, padding: '3px 10px', fontSize: 12, cursor: 'pointer',
+              color: 'var(--color-text-mid)', whiteSpace: 'nowrap',
+            }}>✕ 清除</button>
+          ) : (
+            <>
+              <span style={{ fontSize: 10, color: 'var(--color-text-lo)', marginRight: 2 }}>標記</span>
+              {HL_COLORS.map((c) => (
+                <button key={c.value} onClick={() => addHighlight(c.value)} title={c.label} style={{
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: c.dot, border: '2px solid rgba(255,255,255,0.25)',
+                  cursor: 'pointer', padding: 0, flexShrink: 0,
+                }} />
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
 
 export default function NotePage() {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +178,7 @@ export default function NotePage() {
   const [titleDraft, setTitleDraft] = useState('');
   const [editingSummary, setEditingSummary] = useState(false);
   const [summaryDraft, setSummaryDraft] = useState('');
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -41,6 +190,7 @@ export default function NotePage() {
       setTags(cached.tags ?? []);
       setTitleDraft(cached.aiTitle ?? '');
       setSummaryDraft(cached.aiSummary ?? '');
+      setHighlights(cached.highlights ?? []);
       setSourceView(cached.noteType === 'page' && cached.sourceUrl ? 'iframe' : 'text');
       setLoading(false);
     } else {
@@ -63,6 +213,7 @@ export default function NotePage() {
         setTags(n.tags ?? []);
         setTitleDraft(n.aiTitle ?? '');
         setSummaryDraft(n.aiSummary ?? '');
+        setHighlights(n.highlights ?? []);
         // default to iframe only for full-page captures with a sourceUrl
         setSourceView(n.noteType === 'page' && n.sourceUrl ? 'iframe' : 'text');
 
@@ -136,6 +287,16 @@ export default function NotePage() {
     } catch {} finally {
       setSaving(false);
       setEditingNote(false);
+    }
+  }
+
+  async function handleHighlightsChange(next: Highlight[]) {
+    setHighlights(next);
+    if (!id) return;
+    try {
+      await api.notes.patch(id, { highlights: next });
+    } catch (err) {
+      console.error('[highlights] save failed:', err);
     }
   }
 
@@ -341,24 +502,26 @@ export default function NotePage() {
                     />
                   </div>
                 ) : (
-                  /* Text view fallback */
-                  <div
-                    style={{
-                      background: 'var(--color-surf-1)',
-                      border: '1px solid var(--color-line-faint)',
-                      borderRadius: 'var(--radius-card)',
-                      padding: 16, fontSize: 12,
-                      color: 'var(--color-text-mid)',
-                      lineHeight: 1.7, whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word', maxHeight: 400, overflowY: 'auto',
-                    }}
-                  >
+                  /* Text view with highlighter */
+                  <div>
                     {iframeError && (
                       <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--color-failed)' }}>
                         <Icon name="warning" size={12} style={{ display: 'inline', marginRight: 4 }} /> 此網站不允許嵌入顯示，改為顯示擷取的文字
                       </div>
                     )}
-                    {note.sourceText ?? note.ocrText ?? '（無文字內容）'}
+                    <HighlightedText
+                      text={note.sourceText ?? note.ocrText ?? '（無文字內容）'}
+                      highlights={highlights}
+                      onChange={handleHighlightsChange}
+                    />
+                    {highlights.length > 0 && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-text-lo)', display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span>🖊 {highlights.length} 個標記</span>
+                        <button onClick={() => void handleHighlightsChange([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-lo)', fontSize: 11, textDecoration: 'underline' }}>
+                          全部清除
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

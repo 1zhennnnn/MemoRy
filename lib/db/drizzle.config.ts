@@ -5,6 +5,7 @@ export default defineConfig({
     "./src/schema/notes.ts",
     "./src/schema/tags.ts",
     "./src/schema/daily_reports.ts",
+    "./src/schema/conversations.ts",
   ],
   out: "./drizzle",
   dialect: "postgresql",

@@ -75,7 +75,7 @@ export const api = {
       request<{ noteId: string; aiStatus: string }>('/notes/text', { method: 'POST', body: JSON.stringify(body) }),
     createImage: (body: { imageBase64: string; sourceUrl?: string; sourceTitle?: string; userNote?: string }) =>
       request<{ noteId: string; aiStatus: string }>('/notes/image', { method: 'POST', body: JSON.stringify(body) }),
-    patch: (id: string, body: { aiTitle?: string; aiSummary?: string; userNote?: string; tags?: string[] }) =>
+    patch: (id: string, body: { aiTitle?: string; aiSummary?: string; userNote?: string; tags?: string[]; highlights?: Array<{ start: number; end: number; color: string }> }) =>
       request<{ noteId: string; reembedding: boolean }>(`/notes/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (id: string) => request<void>(`/notes/${id}`, { method: 'DELETE' }),
     retryAi: (id: string) => request<{ noteId: string; aiStatus: string }>(`/notes/${id}/retry-ai`, { method: 'POST' }),

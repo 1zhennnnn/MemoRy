@@ -11,8 +11,8 @@ const PREFETCH: Record<string, () => void> = {
 };
 
 const NAV_ITEMS = [
-  { to: '/graph',     label: '知識星座圖', icon: 'graph'    },
   { to: '/timeline',  label: '時間軸',   icon: 'calendar' },
+  { to: '/graph',     label: '知識星座圖', icon: 'graph'    },
   { to: '/chat',      label: 'AI 助手',  icon: 'sparkle'  },
   { to: '/reports',   label: '日報',     icon: 'report'   },
 ] as const;

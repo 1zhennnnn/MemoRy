@@ -31,7 +31,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/graph" replace />} />
+          <Route index element={<Navigate to="/timeline" replace />} />
           <Route path="graph" element={<GraphPage />} />
           <Route path="new" element={<NewNotePage />} />
           <Route path="timeline" element={<TimelinePage />} />
