@@ -3,12 +3,26 @@ import { db } from "@workspace/db";
 import { notesTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
+import { AppError, ERROR_CODES } from "../lib/errors.js";
 
 const router: IRouter = Router();
 
-router.get("/export", requireAuth, async (req, res, next) => {
+// Export allows token via query param (download links opened in browser can't set headers)
+router.get("/export", async (req, res, next) => {
   try {
-    const userId = req.user!.id;
+    // Prefer Authorization header; fall back to ?token= query param
+    const queryToken = String(req.query["token"] ?? "");
+    if (queryToken && !req.headers.authorization) {
+      req.headers.authorization = `Bearer ${queryToken}`;
+    }
+
+    // Delegate to requireAuth inline
+    await new Promise<void>((resolve, reject) => {
+      requireAuth(req, res, (err) => (err ? reject(err) : resolve()));
+    });
+
+    if (!req.user) throw new AppError("Unauthorized", ERROR_CODES.UNAUTHORIZED, 401);
+    const userId = req.user.id;
     const format = String(req.query["format"] ?? "json");
 
     const notes = await db
