@@ -102,7 +102,6 @@ async function callWithGoogleSearch(
   // Gemini all unavailable — fall back to Groq (notes-only, no web search)
   const groqKey = process.env.GROQ_API_KEY;
   if (groqKey) {
-    const lastUserText = contents.filter((m) => m.role === "user").at(-1)?.parts[0]?.text ?? "";
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
@@ -110,7 +109,10 @@ async function callWithGoogleSearch(
         model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
         messages: [
           { role: "system", content: system },
-          { role: "user", content: lastUserText },
+          ...contents.map((m) => ({
+            role: m.role === "model" ? "assistant" : "user",
+            content: m.parts[0]?.text ?? "",
+          })),
         ],
       }),
     });
