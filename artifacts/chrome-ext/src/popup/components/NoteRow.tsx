@@ -22,7 +22,16 @@ export default function NoteRow({ note }: NoteRowProps) {
       hash = `#ext_token=${encodeURIComponent(accessToken)}`;
       if (refreshToken) hash += `&ext_refresh=${encodeURIComponent(refreshToken)}`;
     }
-    void chrome.tabs.create({ url: `${DASHBOARD_URL}/notes/${note.id}${hash}` });
+    const url = `${DASHBOARD_URL}/notes/${note.id}${hash}`;
+    const existing = await chrome.tabs.query({ url: `${DASHBOARD_URL}/*` });
+    if (existing.length > 0 && existing[0]!.id != null) {
+      await chrome.tabs.update(existing[0]!.id, { url, active: true });
+      if (existing[0]!.windowId != null) {
+        void chrome.windows.update(existing[0]!.windowId, { focused: true });
+      }
+    } else {
+      void chrome.tabs.create({ url });
+    }
   }
 
   return (
