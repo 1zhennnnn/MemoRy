@@ -16,7 +16,11 @@ export default function SidePanelMainView({ onLogout, onNeedRelogin }: Props) {
   const [pageTextState, setPageTextState]     = useState<ActionState>("idle");
   const [lastError, setLastError]             = useState<string | null>(null);
 
-  useEffect(() => { void loadNotes(); }, []);
+  useEffect(() => {
+    void loadNotes();
+    window.addEventListener('focus', loadNotes);
+    return () => window.removeEventListener('focus', loadNotes);
+  }, []);
 
   async function loadNotes() {
     setLoading(true);

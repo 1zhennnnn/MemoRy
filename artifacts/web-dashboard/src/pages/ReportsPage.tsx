@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import Icon from '../components/common/Icon';
+import { reports as rCache } from '../shared/pageCache';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -9,8 +11,8 @@ import Spinner from '../components/common/Spinner';
 
 export default function ReportsPage() {
   const navigate = useNavigate();
-  const [reports, setReports] = useState<DailyReport[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [reports, setReports] = useState<DailyReport[]>(rCache.get() ?? []);
+  const [loading, setLoading] = useState(!rCache.get());
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [confirmingDate, setConfirmingDate] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     api.reports.list()
-      .then(setReports)
+      .then((r) => { setReports(r); rCache.set(r); })
       .catch(() => setError('載入日報失敗'))
       .finally(() => setLoading(false));
   }, []);
@@ -59,7 +61,7 @@ export default function ReportsPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-hi)' }}>知識日報</h1>
         <button className="btn-ai" onClick={handleGenerate} disabled={generating}>
-          {generating ? <Spinner size={14} color="var(--color-circuit-light)" /> : '✦ 生成今日日報'}
+          {generating ? <Spinner size={14} color="var(--color-circuit-light)" /> : <><Icon name="sparkle" size={13} /> 生成今日日報</>}
         </button>
       </div>
 
@@ -67,7 +69,7 @@ export default function ReportsPage() {
 
       {reports.length === 0 ? (
         <EmptyState
-          icon="📅"
+          icon="report"
           title="尚無日報"
           description="需至少 3 筆筆記才能生成日報"
           action={{ label: '生成今日日報', onClick: handleGenerate }}
@@ -79,11 +81,11 @@ export default function ReportsPage() {
               key={r.reportDate}
               className="memory-card"
               style={{ cursor: 'pointer' }}
-              onClick={() => navigate(`/reports/${r.reportDate}`)}
+              onClick={() => navigate(`/reports/${r.reportDate}`, { state: { report: r } })}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontWeight: 600, color: 'var(--color-text-hi)' }}>
-                  📅 {format(parseISO(r.reportDate), 'yyyy年M月d日', { locale: zhTW })}
+                  <Icon name="calendar" size={13} /> {format(parseISO(r.reportDate), 'yyyy年M月d日', { locale: zhTW })}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 12, color: 'var(--color-text-lo)' }}>{r.noteCount} 筆</span>

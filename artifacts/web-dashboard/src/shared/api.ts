@@ -1,4 +1,4 @@
-import { getAccessToken, logout } from './auth';
+import { getAccessToken, logout, refreshAccessToken } from './auth';
 import type {
   NoteCard, NoteDetail, NoteListResponse,
   TagItem, DailyReport, SearchResponse,
@@ -19,6 +19,23 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
   if (res.status === 401) {
+    // Try refreshing the access token before giving up
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      // Retry the original request with the new token
+      const retryRes = await fetch(`${API_BASE}/api${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getAccessToken()}`,
+          ...(options?.headers ?? {}),
+        },
+      });
+      if (retryRes.ok) {
+        if (retryRes.status === 204) return undefined as T;
+        return retryRes.json() as Promise<T>;
+      }
+    }
     logout();
     throw new Error('登入已過期，請重新登入');
   }
@@ -58,7 +75,7 @@ export const api = {
       request<{ noteId: string; aiStatus: string }>('/notes/text', { method: 'POST', body: JSON.stringify(body) }),
     createImage: (body: { imageBase64: string; sourceUrl?: string; sourceTitle?: string; userNote?: string }) =>
       request<{ noteId: string; aiStatus: string }>('/notes/image', { method: 'POST', body: JSON.stringify(body) }),
-    patch: (id: string, body: { userNote?: string; tags?: string[] }) =>
+    patch: (id: string, body: { aiTitle?: string; aiSummary?: string; userNote?: string; tags?: string[] }) =>
       request<{ noteId: string; reembedding: boolean }>(`/notes/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (id: string) => request<void>(`/notes/${id}`, { method: 'DELETE' }),
     retryAi: (id: string) => request<{ noteId: string; aiStatus: string }>(`/notes/${id}/retry-ai`, { method: 'POST' }),
@@ -74,6 +91,7 @@ export const api = {
   reports: {
     list: () => request<ReportsListResponse>('/reports').then((r) => r.reports),
     get: (date: string) => request<DailyReport>(`/reports/${date}`),
+    getRelated: (date: string) => request<{ relatedNotes: DailyReport['relatedNotes'] }>(`/reports/${date}/related`),
     generate: () => request<DailyReport>('/reports/generate', { method: 'POST' }),
     delete: (date: string) => request<void>(`/reports/${date}`, { method: 'DELETE' }),
     patch: (date: string, diaryText: string) =>
@@ -92,6 +110,23 @@ export const api = {
         webSources: Array<{ web?: { uri: string; title: string } }>;
         toolCalls: number;
       }>('/agent/chat', { method: 'POST', body: JSON.stringify({ messages }) }),
+    listConversations: () =>
+      request<Array<{ id: string; title: string; updatedAt: string }>>('/agent/conversations'),
+    getConversation: (id: string) =>
+      request<{ id: string; title: string; messages: unknown[]; updatedAt: string }>(`/agent/conversations/${id}`),
+    createConversation: (title?: string) =>
+      request<{ id: string; title: string }>('/agent/conversations', { method: 'POST', body: JSON.stringify({ title }) }),
+    updateConversation: (id: string, body: { messages?: unknown[]; title?: string }) =>
+      request<{ id: string }>(`/agent/conversations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    deleteConversation: (id: string) =>
+      request<void>(`/agent/conversations/${id}`, { method: 'DELETE' }),
+  },
+
+  graph: {
+    get: () => request<{
+      nodes: Array<{ id: string; title: string | null; summary: string | null; tags: string[] }>;
+      edges: Array<{ source: string; target: string; type: 'tag' | 'semantic'; weight: number }>;
+    }>('/graph'),
   },
 
   export: {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Icon from '../components/common/Icon';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
@@ -63,7 +64,7 @@ export default function BookmarksPage() {
   if (initialLoaded && bookmarks.length === 0) {
     return (
       <EmptyState
-        icon="🔗"
+        icon="bookmark"
         title="還沒有書籤"
         description="在 Chrome Extension 側欄按「快速書籤」即可儲存當前頁面"
       />
@@ -94,7 +95,7 @@ export default function BookmarksPage() {
                   fontWeight: 600, fontSize: 14, color: 'var(--color-text-hi)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  🔗 {b.aiTitle ?? b.sourceUrl ?? '未命名書籤'}
+                  <Icon name="link" size={13} style={{ flexShrink: 0 }} /> {b.aiTitle ?? b.sourceUrl ?? '未命名書籤'}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-lo)', marginTop: 4, display: 'flex', gap: 8 }}>
                   <span style={{ fontFamily: 'var(--font-mono)' }}>{domain(b.sourceUrl)}</span>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { api } from '../shared/api';
+import { timeline as tlCache } from '../shared/pageCache';
 import type { NoteCard as NoteCardType } from '../shared/types';
 import NoteCard from '../components/notes/NoteCard';
 import EmptyState from '../components/common/EmptyState';
@@ -22,11 +23,12 @@ function formatDay(dateStr: string) {
 }
 
 export default function TimelinePage() {
-  const [notes, setNotes] = useState<NoteCardType[]>([]);
+  const cached = tlCache.get();
+  const [notes, setNotes] = useState<NoteCardType[]>(cached?.notes ?? []);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [totalPages, setTotalPages] = useState(cached?.totalPages ?? 1);
   const [loading, setLoading] = useState(false);
-  const [initialLoaded, setInitialLoaded] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(!!cached);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const loadPage = useCallback(async (p: number) => {
@@ -34,8 +36,11 @@ export default function TimelinePage() {
     setLoading(true);
     try {
       const res = await api.notes.list({ page: p, limit: 20 });
-      setNotes((prev) => (p === 1 ? res.notes : [...prev, ...res.notes]));
-      setTotalPages(Math.ceil(res.total / 20));
+      const newNotes = p === 1 ? res.notes : [...notes, ...res.notes];
+      setNotes(newNotes);
+      const tp = Math.ceil(res.total / 20);
+      setTotalPages(tp);
+      if (p === 1) tlCache.set({ notes: newNotes, totalPages: tp });
     } catch {
       // silently fail — network error
     } finally {
@@ -47,6 +52,19 @@ export default function TimelinePage() {
   useEffect(() => {
     void loadPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Refresh first page when user returns to the tab (focus)
+  useEffect(() => {
+    const refresh = () => {
+      void api.notes.list({ page: 1, limit: 20 }).then((res) => {
+        setNotes(res.notes);
+        setTotalPages(Math.ceil(res.total / 20));
+        tlCache.set({ notes: res.notes, totalPages: Math.ceil(res.total / 20) });
+      }).catch(() => {});
+    };
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
   }, []);
 
   // Infinite scroll
@@ -80,7 +98,7 @@ export default function TimelinePage() {
   if (initialLoaded && notes.length === 0) {
     return (
       <EmptyState
-        icon="📭"
+        icon="note"
         title="還沒有筆記"
         description="安裝 Chrome Extension 開始擷取網頁知識"
       />

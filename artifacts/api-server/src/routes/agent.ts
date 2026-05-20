@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { notesTable } from "@workspace/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { notesTable, conversationsTable } from "@workspace/db/schema";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import { AppError, ERROR_CODES } from "../lib/errors.js";
 import { embedText } from "../lib/ai.js";
@@ -9,8 +9,11 @@ import { embedText } from "../lib/ai.js";
 const router: IRouter = Router();
 
 const GEMMA_KEY = process.env.GEMINI_API_KEY ?? process.env.GEMMA_API_KEY;
-const AGENT_MODEL_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+// Primary: gemini-2.5-flash; fallback: gemini-2.0-flash (used on 503 overload)
+const AGENT_MODELS = [
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+];
 
 // ── Note search via embedding ─────────────────────────────────────────────────
 
@@ -60,39 +63,133 @@ async function callWithGoogleSearch(
   system: string,
 ): Promise<{ answer: string; webSources: GroundingChunk[] }> {
   if (!GEMMA_KEY) throw new AppError("AI API key not configured", ERROR_CODES.AI_ERROR, 500);
-  const res = await fetch(`${AGENT_MODEL_URL}?key=${GEMMA_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: system }] },
-      tools: [{ google_search: {} }],
-      contents,
-    }),
-  });
-  if (!res.ok) {
-    throw new AppError(`Gemini error ${res.status}: ${await res.text()}`, ERROR_CODES.AI_ERROR, 500);
+
+  let lastErr: unknown;
+  for (const modelUrl of AGENT_MODELS) {
+    const res = await fetch(`${modelUrl}?key=${GEMMA_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: system }] },
+        tools: [{ google_search: {} }],
+        contents,
+      }),
+    });
+    if (res.status === 503 || res.status === 429) {
+      lastErr = new Error(`Gemini ${res.status}`);
+      continue; // try next model
+    }
+    if (!res.ok) {
+      throw new AppError(`Gemini error ${res.status}: ${await res.text()}`, ERROR_CODES.AI_ERROR, 500);
+    }
+    type Part = { text?: string; thought?: boolean };
+    const data = await res.json() as {
+      candidates?: Array<{
+        content?: { parts?: Part[] };
+        groundingMetadata?: { groundingChunks?: GroundingChunk[] };
+      }>;
+    };
+    const candidate = data.candidates?.[0];
+    const parts = candidate?.content?.parts ?? [];
+    const answer = parts
+      .filter((p) => p.text && !p.thought)
+      .map((p) => p.text!)
+      .join("")
+      .trim() || "無法生成回答。";
+    const webSources = candidate?.groundingMetadata?.groundingChunks?.filter((c) => c.web) ?? [];
+    return { answer, webSources };
   }
-  type Part = { text?: string; thought?: boolean };
-  const data = await res.json() as {
-    candidates?: Array<{
-      content?: { parts?: Part[] };
-      groundingMetadata?: { groundingChunks?: GroundingChunk[] };
-    }>;
-  };
-  const candidate = data.candidates?.[0];
-  const parts = candidate?.content?.parts ?? [];
-  const answer = parts
-    .filter((p) => p.text && !p.thought)
-    .map((p) => p.text!)
-    .join("")
-    .trim() || "無法生成回答。";
-  const webSources = candidate?.groundingMetadata?.groundingChunks?.filter((c) => c.web) ?? [];
-  return { answer, webSources };
+  // Gemini all unavailable — fall back to Groq (notes-only, no web search)
+  const groqKey = process.env.GROQ_API_KEY;
+  if (groqKey) {
+    const lastUserText = contents.filter((m) => m.role === "user").at(-1)?.parts[0]?.text ?? "";
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
+      body: JSON.stringify({
+        model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: lastUserText },
+        ],
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const answer = data.choices?.[0]?.message?.content ?? "無法生成回答。";
+      return { answer, webSources: [] };
+    }
+  }
+  throw new AppError(`All AI models unavailable: ${String(lastErr)}`, ERROR_CODES.AI_ERROR, 503);
 }
 
-// ── Route ─────────────────────────────────────────────────────────────────────
+// ── Conversation CRUD ─────────────────────────────────────────────────────────
 
-interface ChatMessage { role: "user" | "assistant"; content: string; }
+interface ChatMessage { role: "user" | "assistant"; content: string; webSources?: unknown[]; sources?: unknown[]; }
+
+// List conversations
+router.get("/agent/conversations", requireAuth, async (req, res, next) => {
+  try {
+    const rows = await db
+      .select({ id: conversationsTable.id, title: conversationsTable.title, updatedAt: conversationsTable.updatedAt })
+      .from(conversationsTable)
+      .where(eq(conversationsTable.userId, req.user!.id))
+      .orderBy(desc(conversationsTable.updatedAt));
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// Get single conversation
+router.get("/agent/conversations/:id", requireAuth, async (req, res, next) => {
+  try {
+    const [row] = await db
+      .select()
+      .from(conversationsTable)
+      .where(and(eq(conversationsTable.id, String(req.params["id"])), eq(conversationsTable.userId, req.user!.id)))
+      .limit(1);
+    if (!row) throw new AppError("Not found", ERROR_CODES.NOT_FOUND, 404);
+    res.json(row);
+  } catch (err) { next(err); }
+});
+
+// Create conversation
+router.post("/agent/conversations", requireAuth, async (req, res, next) => {
+  try {
+    const { title } = req.body as { title?: string };
+    const [row] = await db
+      .insert(conversationsTable)
+      .values({ userId: req.user!.id, title: title ?? "新對話", messages: [] })
+      .returning();
+    res.status(201).json(row);
+  } catch (err) { next(err); }
+});
+
+// Update conversation (messages + auto-title)
+router.patch("/agent/conversations/:id", requireAuth, async (req, res, next) => {
+  try {
+    const { messages, title } = req.body as { messages?: ChatMessage[]; title?: string };
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (messages !== undefined) updates["messages"] = messages;
+    if (title !== undefined) updates["title"] = title;
+    await db
+      .update(conversationsTable)
+      .set(updates)
+      .where(and(eq(conversationsTable.id, String(req.params["id"])), eq(conversationsTable.userId, req.user!.id)));
+    res.json({ id: req.params["id"] });
+  } catch (err) { next(err); }
+});
+
+// Delete conversation
+router.delete("/agent/conversations/:id", requireAuth, async (req, res, next) => {
+  try {
+    await db
+      .delete(conversationsTable)
+      .where(and(eq(conversationsTable.id, String(req.params["id"])), eq(conversationsTable.userId, req.user!.id)));
+    res.status(204).end();
+  } catch (err) { next(err); }
+});
+
+// ── Chat route ────────────────────────────────────────────────────────────────
 
 router.post("/agent/chat", requireAuth, async (req, res, next) => {
   try {

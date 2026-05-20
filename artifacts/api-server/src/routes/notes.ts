@@ -20,9 +20,13 @@ async function upsertTags(userId: string, tags: string[]): Promise<void> {
     });
 }
 
-async function triggerAiProcessing(noteId: string, sourceText: string): Promise<void> {
+async function triggerAiProcessing(
+  noteId: string,
+  sourceText: string,
+  ctx?: { sourceTitle?: string | null; sourceUrl?: string | null },
+): Promise<void> {
   try {
-    const { title, summary, tags } = await summarizeText(sourceText);
+    const { title, summary, tags } = await summarizeText(sourceText, ctx);
 
     await db
       .update(notesTable)
@@ -145,6 +149,7 @@ router.get("/notes", requireAuth, async (req, res, next) => {
           id:          notesTable.id,
           aiTitle:     notesTable.aiTitle,
           aiSummary:   notesTable.aiSummary,
+          userNote:    notesTable.userNote,
           tags:        notesTable.tags,
           sourceUrl:   notesTable.sourceUrl,
           sourceTitle: notesTable.sourceTitle,
@@ -192,7 +197,7 @@ router.post("/notes/text", requireAuth, async (req, res, next) => {
       .returning({ id: notesTable.id, aiStatus: notesTable.aiStatus });
 
     req.log.info({ noteId: note!.id }, "Text note created");
-    void triggerAiProcessing(note!.id, sourceText);
+    void triggerAiProcessing(note!.id, sourceText, { sourceTitle, sourceUrl });
 
     res.status(201).json({ noteId: note!.id, aiStatus: note!.aiStatus });
   } catch (err) {
@@ -352,7 +357,7 @@ router.post("/notes/:id/retry-ai", requireAuth, async (req, res, next) => {
       .limit(1);
 
     if (!note) throw new AppError("Note not found", ERROR_CODES.NOT_FOUND, 404);
-    if (note.aiStatus === "done") throw new AppError("Already processed", ERROR_CODES.VALIDATION_ERROR, 400);
+    if (note.aiStatus === "done") throw new AppError("Already processed", ERROR_CODES.INVALID_INPUT, 400);
 
     const text = note.sourceText ?? note.ocrText;
     if (!text) throw new AppError("No text to process", ERROR_CODES.MISSING_FIELD, 400);

@@ -5,6 +5,7 @@ export interface NoteCard {
   id: string;
   aiTitle: string | null;
   aiSummary: string | null;
+  userNote: string | null;
   aiStatus: AiStatus;
   tags: string[];
   sourceUrl: string | null;
@@ -39,6 +40,7 @@ export interface DailyReport {
   crossDomain: string | null;
   suggestions: string[];
   diaryText: string | null;
+  relatedNotes?: NoteCard[];
 }
 
 export interface SearchResponse {
